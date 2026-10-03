@@ -9,3 +9,6 @@ ios/
 android/
 web-build/
 .media/
+
+# Google Play upload key for `eas submit` — never commit
+apps/mobile/google-play-service-account.json
