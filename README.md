@@ -32,6 +32,11 @@ packages/crypto  End-to-end encryption shared by both (libsodium)
   else; the last person out deletes the group and its media.
 - **Status** — text or photo updates that disappear after 24 hours, shown to
   people you have an accepted chat with. End-to-end encrypted; you see who viewed.
+- **Channels** — public one-way broadcasts in the Updates tab: anyone can find
+  and follow a channel; the owner posts text and photos; followers react.
+- **Communities** — groups under one roof with an announcements chat only
+  admins post to. Members join any group in the community themselves; leaving
+  the community leaves all of its groups.
 - **Timeline** — public posts with an optional photo, likes and comments.
 - **Settings & dark mode** — system / light / dark, read-receipt privacy,
   notification and account settings.
@@ -61,8 +66,9 @@ packages/crypto  End-to-end encryption shared by both (libsodium)
 - **Safety number.** Chat info shows a number derived from both people's keys.
   If it matches on both phones, the server hasn't swapped in its own key.
 
-**Not encrypted (by design):** timeline posts, comments and post photos are
-public. The server also sees usernames, who is in which chat, group names,
+**Not encrypted (by design):** timeline posts, comments, post photos and
+channels (posts, photos, reactions) are public. Community chats are ordinary
+encrypted groups. The server also sees usernames, who is in which chat, group names,
 group descriptions and history, message timestamps and sizes, read receipts, typing, who viewed a status, and reports.
 
 **Known limitations:**

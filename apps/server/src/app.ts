@@ -9,7 +9,9 @@ import { members } from './db/schema';
 import type { Push } from './push';
 import { Hub } from './realtime';
 import { registerAccounts } from './routes/accounts';
+import { registerChannels } from './routes/channels';
 import { registerChats } from './routes/chats';
+import { registerCommunities } from './routes/communities';
 import { registerMedia } from './routes/media';
 import { registerSafety } from './routes/safety';
 import { registerStatus } from './routes/status';
@@ -43,7 +45,9 @@ export function createApp(deps: Deps) {
   deps.beforeRoutes?.(app);
 
   registerAccounts(app, ctx);
-  registerChats(app, ctx);
+  const chats = registerChats(app, ctx);
+  registerCommunities(app, ctx, chats);
+  registerChannels(app, ctx);
   registerTimeline(app, ctx);
   registerSafety(app, ctx);
   const status = registerStatus(app, ctx);

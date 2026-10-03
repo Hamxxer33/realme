@@ -2,7 +2,7 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-import { Avatar, GroupAvatar } from '../../components/Avatar';
+import { ConversationAvatar } from '../../components/Avatar';
 import { Bubble } from '../../components/Bubble';
 import { Composer } from '../../components/Composer';
 import { Icon } from '../../components/Icon';
@@ -93,7 +93,8 @@ function Chat({ conv }: { conv: ConversationView }) {
   const typingNames = chat.typingUserIds.map((uid) => conv.members.find((m) => m.id === uid)?.displayName).filter(Boolean);
   const subtitle = typingNames.length
     ? `${isGroup ? typingNames.join(', ') + ' ' : ''}typing…`
-    : isGroup ? `${conv.members.length} people` : others[0] ? `@${others[0].username}` : '';
+    : conv.announcements ? `Announcements · ${conv.members.length} members`
+      : isGroup ? `${conv.community ? `${conv.community.name} · ` : ''}${conv.members.length} people` : others[0] ? `@${others[0].username}` : '';
 
   const accept = async () => {
     try {
@@ -145,9 +146,7 @@ function Chat({ conv }: { conv: ConversationView }) {
       {query === null ? <TopBar
         title={title}
         subtitle={subtitle}
-        avatar={isGroup
-          ? <GroupAvatar size={40} />
-          : <Avatar name={title} seed={others[0]?.username ?? conv.id} size={40} />}
+        avatar={<ConversationAvatar conv={conv} title={title} seed={others[0]?.username ?? conv.id} size={40} />}
         onBack={() => router.back()}
         onInfo={() => router.push(`/chat-info/${conv.id}`)}
       /> : null}
@@ -157,7 +156,7 @@ function Chat({ conv }: { conv: ConversationView }) {
         data={rows}
         keyExtractor={(r) => (r.type === 'message' ? r.item.clientId : `event:${r.event.id}`)}
         renderItem={({ item: row, index }) => {
-          if (row.type === 'event') return <EventPill text={describeEvent(row.event, myId)} />;
+          if (row.type === 'event') return <EventPill text={describeEvent(row.event, myId, conv.announcements)} />;
           const item = row.item;
           const olderRow = rows[index + 1];
           const older = olderRow?.type === 'message' ? olderRow.item : undefined;

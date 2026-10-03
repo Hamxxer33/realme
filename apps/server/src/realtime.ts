@@ -5,7 +5,9 @@ export type ServerEvent =
   | { type: 'read'; conversationId: string; userId: string; lastReadAt: string }
   | { type: 'typing'; conversationId: string; userId: string }
   | { type: 'conversation_changed'; conversationId: string }
-  | { type: 'status_changed'; authorId: string };
+  | { type: 'status_changed'; authorId: string }
+  | { type: 'channel_post'; channelId: string }
+  | { type: 'community_changed'; communityId: string };
 
 /** Tracks open sockets per user. Single-process; see README for scaling past one instance. */
 export class Hub {

@@ -37,6 +37,31 @@ export function GroupAvatar({ size = 44 }: { size?: number }) {
   );
 }
 
+/** Communities are rounded squares, so they never read as a person or a group chat. */
+export function CommunityAvatar({ size = 44, announcements }: { size?: number; announcements?: boolean }) {
+  return (
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no"
+      style={[styles.circle, { width: size, height: size, borderRadius: size * 0.3, backgroundColor: announcements ? colors.roseFill : colors.roseTint }]}
+    >
+      <Icon name={announcements ? 'megaphone' : 'community'} color={announcements ? colors.onRose : colors.rose} size={size * 0.52} />
+    </View>
+  );
+}
+
+/** The right avatar for any chat: a person, a group, or a community's announcements. */
+export function ConversationAvatar({ conv, title, seed, size = 44 }: {
+  conv: { kind: 'direct' | 'group'; announcements: boolean };
+  title: string;
+  seed: string;
+  size?: number;
+}) {
+  if (conv.announcements) return <CommunityAvatar size={size} announcements />;
+  if (conv.kind === 'group') return <GroupAvatar size={size} />;
+  return <Avatar name={title} seed={seed} size={size} />;
+}
+
 const styles = themed(() => StyleSheet.create({
   circle: { alignItems: 'center', justifyContent: 'center' },
   // Pastel circles in both themes, so initials stay dark ink.

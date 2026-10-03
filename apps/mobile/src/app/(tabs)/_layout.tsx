@@ -35,6 +35,7 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen name="updates" options={{ title: 'Updates', tabBarIcon: ({ color }) => <Icon name="updates" color={String(color)} /> }} />
+      <Tabs.Screen name="communities" options={{ title: 'Communities', tabBarIcon: ({ color }) => <Icon name="community" color={String(color)} /> }} />
       <Tabs.Screen name="profile" options={{ title: 'You', tabBarIcon: ({ color }) => <Icon name="user" color={String(color)} /> }} />
     </Tabs>
   );

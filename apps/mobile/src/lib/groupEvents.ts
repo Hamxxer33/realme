@@ -36,15 +36,16 @@ export function useGroupEvents(conv: ConversationView) {
 }
 
 /** One-line description, from my point of view. */
-export function describeEvent(e: GroupEvent, myId: string) {
+export function describeEvent(e: GroupEvent, myId: string, announcements = false) {
   const who = (p: GroupEvent['actor']) => (!p ? 'Someone' : p.id === myId ? 'You' : p.displayName);
   const whom = (p: GroupEvent['target']) => (!p ? 'someone' : p.id === myId ? 'you' : p.displayName);
   const actor = who(e.actor);
   switch (e.kind) {
-    case 'created': return `${actor} created the group "${e.detail ?? ''}"`;
+    case 'created': return `${actor} created the ${announcements ? 'community' : 'group'} "${e.detail ?? ''}"`;
     case 'added': return `${actor} added ${whom(e.target)}`;
     case 'removed': return `${actor} removed ${whom(e.target)}`;
     case 'left': return `${actor} left`;
+    case 'joined': return `${actor} joined from the community`;
     case 'renamed': return `${actor} changed the group name to "${e.detail ?? ''}"`;
     case 'described': return `${actor} changed the group description`;
     case 'promoted': return e.actor

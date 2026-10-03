@@ -78,6 +78,8 @@ export interface ConversationView {
   adminsOnlyMessages: boolean;
   adminsOnlyEdit: boolean;
   createdBy: { id: string; displayName: string; username: string } | null;
+  community: { id: string; name: string } | null;
+  announcements: boolean;
   createdAt: string;
   lastMessageAt: string | null;
   myStatus: 'accepted' | 'pending';
@@ -90,11 +92,58 @@ export interface ConversationView {
 
 export interface GroupEvent {
   id: string;
-  kind: 'created' | 'added' | 'removed' | 'left' | 'renamed' | 'described' | 'promoted' | 'demoted' | 'settings';
+  kind: 'created' | 'added' | 'removed' | 'left' | 'joined' | 'renamed' | 'described' | 'promoted' | 'demoted' | 'settings';
   actor: { id: string; displayName: string } | null;
   target: { id: string; displayName: string } | null;
   detail: string | null;
   createdAt: string;
+}
+
+export interface ChannelView {
+  id: string;
+  name: string;
+  description: string;
+  owner: PublicUser;
+  isOwner: boolean;
+  followerCount: number;
+  following: boolean;
+  muted: boolean;
+  unreadCount: number;
+  createdAt: string;
+  lastPostAt: string | null;
+  lastPost: { text: string; hasMedia: boolean } | null;
+}
+
+export interface ChannelPost {
+  id: string;
+  channelId: string;
+  text: string;
+  media: { objectKey: string; width: number | null; height: number | null } | null;
+  createdAt: string;
+  reactions: Record<string, number>;
+  myReaction: string | null;
+}
+
+export const CHANNEL_REACTIONS = ['❤️', '👍', '😂', '😮', '😢', '🙏'] as const;
+
+export interface CommunityGroup {
+  id: string;
+  title: string;
+  description: string;
+  memberCount: number;
+  joined: boolean;
+}
+
+export interface CommunityView {
+  id: string;
+  name: string;
+  description: string;
+  createdAt: string;
+  announcementsId: string;
+  myRole: 'admin' | 'member';
+  myStatus: 'accepted' | 'pending';
+  memberCount: number;
+  groups: CommunityGroup[];
 }
 
 export interface PostView {

@@ -73,9 +73,13 @@ export function MemberSheet({ conv, member, myId, onClose }: {
   });
 
   const remove = run(async () => {
-    if (!(await confirm(`Remove ${member!.displayName}?`, 'They will no longer get new messages in this group.', 'Remove'))) return;
+    const body = conv.announcements ? 'They will leave the community and all of its groups.' : 'They will no longer get new messages in this group.';
+    if (!(await confirm(`Remove ${member!.displayName}?`, body, 'Remove'))) return;
     try {
-      await api('DELETE', `/conversations/${conv.id}/members/${member!.id}`);
+      // In a community's announcements, removing someone removes them from the whole community.
+      await api('DELETE', conv.announcements && conv.community
+        ? `/communities/${conv.community.id}/members/${member!.id}`
+        : `/conversations/${conv.id}/members/${member!.id}`);
       upsert({ ...conv, members: conv.members.filter((m) => m.id !== member!.id) });
     } catch {
       notify("Couldn't remove");

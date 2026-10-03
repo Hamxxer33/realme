@@ -5,7 +5,7 @@ import type { ConversationView } from '../lib/api';
 import { conversationTitle, otherMembers, shortTime } from '../lib/format';
 import { useSession } from '../lib/session';
 import { colors, fonts, space, themed } from '../theme';
-import { Avatar, GroupAvatar } from './Avatar';
+import { ConversationAvatar } from './Avatar';
 
 function preview(body: MessageBody | null, mine: boolean, sender: string | null) {
   const who = mine ? 'You: ' : sender ? `${sender}: ` : '';
@@ -29,7 +29,7 @@ export const ConversationRow = memo(function ConversationRow({ conv, onPress }: 
 
   useEffect(() => {
     let alive = true;
-    if (!last) return setText(conv.kind === 'group' ? `${conv.members.length} people` : 'Say hi 👋');
+    if (!last) return setText(conv.kind === 'group' ? (conv.members.length === 1 ? 'Just you so far' : `${conv.members.length} people`) : 'Say hi 👋');
     void publicKeyOf(last.senderId, conv).then((key) => {
       let body: MessageBody | null = null;
       try {
@@ -53,9 +53,7 @@ export const ConversationRow = memo(function ConversationRow({ conv, onPress }: 
       onPress={onPress}
       style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surfaceMuted }]}
     >
-      {conv.kind === 'group'
-        ? <GroupAvatar size={52} />
-        : <Avatar name={title} seed={others[0]?.username ?? conv.id} size={52} />}
+      <ConversationAvatar conv={conv} title={title} seed={others[0]?.username ?? conv.id} size={52} />
       <View style={{ flex: 1, gap: 2 }}>
         <View style={styles.top}>
           <Text style={[styles.title, unread && { fontFamily: fonts.heavy }]} numberOfLines={1}>{title}</Text>

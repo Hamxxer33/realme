@@ -2,7 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { Avatar, GroupAvatar } from '../../components/Avatar';
+import { Avatar, ConversationAvatar, GroupAvatar } from '../../components/Avatar';
 import { Icon, type IconName } from '../../components/Icon';
 import { EncryptedImage } from '../../components/Media';
 import { MemberRow as GroupMemberRow, MemberSheet, sortMembers } from '../../components/GroupMembers';
@@ -36,7 +36,8 @@ function ChatInfo({ conv }: { conv: ConversationView }) {
 
   const isGroup = conv.kind === 'group';
   const admin = conv.myRole === 'admin';
-  const canEdit = isGroup && conv.myStatus === 'accepted' && (admin || !conv.adminsOnlyEdit);
+  // A community's announcements are edited from the community itself.
+  const canEdit = isGroup && !conv.announcements && conv.myStatus === 'accepted' && (admin || !conv.adminsOnlyEdit);
   const PREVIEW = 8;
   const sortedMembers = useMemo(() => sortMembers(conv.members, myId), [conv.members, myId]);
   const others = otherMembers(conv, myId);
@@ -82,6 +83,14 @@ function ChatInfo({ conv }: { conv: ConversationView }) {
   };
 
   const leave = async () => {
+    if (conv.announcements && conv.community) {
+      const ok = await confirm(`Leave ${conv.community.name}?`, "You'll leave the announcements and every group in this community.", 'Leave community');
+      if (!ok) return;
+      await api('DELETE', `/communities/${conv.community.id}/membership`).catch(() => {});
+      forget(conv.id);
+      router.dismissAll();
+      return;
+    }
     const ok = await confirm(
       isGroup ? `Leave ${name}?` : 'Delete this chat?',
       isGroup ? "You won't get new messages from this group." : 'It will be removed from your chats. They can still message you.',
@@ -107,10 +116,12 @@ function ChatInfo({ conv }: { conv: ConversationView }) {
       <ScrollView contentContainerStyle={styles.container}>
         {/* Hero */}
         <Animated.View entering={FadeInDown.springify().damping(20)} style={styles.hero}>
-          {isGroup ? <GroupAvatar size={112} /> : <Avatar name={name} seed={other?.username ?? conv.id} size={112} />}
+          <ConversationAvatar conv={conv} title={name} seed={other?.username ?? conv.id} size={112} />
           <Text accessibilityRole="header" style={styles.name}>{name}</Text>
           <Text style={styles.sub}>
-            {isGroup ? `Group · ${conv.members.length} ${conv.members.length === 1 ? 'member' : 'members'}` : other ? `@${other.username}` : ''}
+            {isGroup
+              ? `${conv.announcements ? 'Announcements' : 'Group'} · ${conv.members.length} ${conv.members.length === 1 ? 'member' : 'members'}`
+              : other ? `@${other.username}` : ''}
           </Text>
           {!isGroup && other?.bio ? <Text style={styles.bio}>{other.bio}</Text> : null}
 
@@ -124,6 +135,12 @@ function ChatInfo({ conv }: { conv: ConversationView }) {
             <QuickAction icon={conv.myMuted ? 'bellOff' : 'bell'} label={conv.myMuted ? 'Unmute' : 'Mute'} onPress={() => void setMuted(!conv.myMuted)} />
           </View>
         </Animated.View>
+
+        {conv.community ? (
+          <Section>
+            <Row icon="community" accent title={conv.community.name} subtitle={conv.announcements ? 'Community · Only admins can post here' : 'Part of this community'} onPress={() => router.push(`/community/${conv.community!.id}`)} />
+          </Section>
+        ) : null}
 
         {isGroup ? (
           <Section>
@@ -185,7 +202,7 @@ function ChatInfo({ conv }: { conv: ConversationView }) {
               />
             }
           />
-          {isGroup && admin ? (
+          {isGroup && admin && !conv.announcements ? (
             <Row icon="settings" title="Group settings" subtitle={groupSettingsSummary(conv)} onPress={() => router.push(`/group-settings/${conv.id}`)} />
           ) : null}
           <Row
@@ -240,7 +257,7 @@ function ChatInfo({ conv }: { conv: ConversationView }) {
         <Section>
           <Row icon="eraser" danger title="Clear chat" onPress={() => void clearChat()} />
           {isGroup ? (
-            <Row icon="logout" danger title="Leave group" onPress={() => void leave()} />
+            <Row icon="logout" danger title={conv.announcements ? 'Leave community' : 'Leave group'} onPress={() => void leave()} />
           ) : (
             <>
               <Row icon="block" danger title={`Block ${other?.displayName ?? ''}`} onPress={() => void block()} />

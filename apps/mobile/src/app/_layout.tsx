@@ -80,6 +80,13 @@ function Routes() {
         <Stack.Screen name="settings/appearance" />
         <Stack.Screen name="settings/notifications" />
         <Stack.Screen name="settings/help" />
+        <Stack.Screen name="channel/[id]" />
+        <Stack.Screen name="channel-info/[id]" />
+        <Stack.Screen name="channels-explore" />
+        <Stack.Screen name="channel-new" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="community/[id]" />
+        <Stack.Screen name="community-new" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="community-group-new" options={{ presentation: 'modal' }} />
         <Stack.Screen name="photo" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
         <Stack.Screen name="status/[authorId]" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
         <Stack.Screen name="status-compose" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />

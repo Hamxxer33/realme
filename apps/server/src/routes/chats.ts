@@ -4,7 +4,7 @@ import { z } from 'zod';
 import {
   type App, type Ctx, type User, HOUR, blockedBetween, fail, memberIds, publicUser, rateLimit, requireMembership, requireUser,
 } from '../context';
-import { blocks, conversationEvents, conversations, members, messages, users } from '../db/schema';
+import { blocks, communities, conversationEvents, conversations, members, messages, users } from '../db/schema';
 import { MAX_CIPHERTEXT_CHARS, b64, uuid } from '../validation';
 
 export const MAX_GROUP_MEMBERS = 64;
@@ -57,6 +57,9 @@ export function registerChats(app: App, ctx: Ctx) {
     const creatorIds = [...new Set(convs.map((c) => c.createdBy).filter((id): id is string => !!id))];
     const creators = new Map((creatorIds.length ? await db.select().from(users).where(inArray(users.id, creatorIds)) : [])
       .map((u) => [u.id, { id: u.id, displayName: u.displayName, username: u.username }]));
+    const communityIds = [...new Set(convs.map((c) => c.communityId).filter((id): id is string => !!id))];
+    const communityNames = new Map((communityIds.length ? await db.select().from(communities).where(inArray(communities.id, communityIds)) : [])
+      .map((c) => [c.id, c.name]));
     const lastBy = new Map(last.map((r) => [r.conversation_id, r]));
     const unreadBy = new Map(unread.map((r) => [r.conversation_id, r.n]));
 
@@ -71,6 +74,8 @@ export function registerChats(app: App, ctx: Ctx) {
         adminsOnlyMessages: conv.adminsOnlyMessages,
         adminsOnlyEdit: conv.adminsOnlyEdit,
         createdBy: conv.createdBy ? creators.get(conv.createdBy) ?? null : null,
+        community: conv.communityId ? { id: conv.communityId, name: communityNames.get(conv.communityId) ?? 'Community' } : null,
+        announcements: conv.announcements,
         createdAt: conv.createdAt,
         lastMessageAt: conv.lastMessageAt,
         myStatus: mine.status,
@@ -216,6 +221,7 @@ export function registerChats(app: App, ctx: Ctx) {
       if (member.status !== 'accepted') fail(403, 'Accept the invite first');
       const editsInfo = patch.title !== undefined || patch.description !== undefined;
       const editsSettings = patch.adminsOnlyMessages !== undefined || patch.adminsOnlyEdit !== undefined;
+      if (conversation.announcements && (editsSettings || editsInfo)) fail(400, 'Edit the community instead');
       if (editsSettings && !admin) fail(403, 'Only group admins can change group settings');
       if (editsInfo && !admin && conversation.adminsOnlyEdit) fail(403, 'Only group admins can edit group info');
 
@@ -339,7 +345,9 @@ export function registerChats(app: App, ctx: Ctx) {
     }
     if (!remaining.length) {
       await ctx.storage.deletePrefix(`conversations/${conversationId}/`);
-      await db.delete(conversations).where(eq(conversations.id, conversationId));
+      const [gone] = await db.delete(conversations).where(eq(conversations.id, conversationId)).returning();
+      // The last person out of a community's announcements closes the community (its groups live on).
+      if (gone?.announcements && gone.communityId) await db.delete(communities).where(eq(communities.id, gone.communityId));
       return;
     }
     // A group always keeps an admin.
@@ -489,7 +497,7 @@ export function registerChats(app: App, ctx: Ctx) {
       return c.json({ ok: true });
     });
 
-  return { removeMember };
+  return { removeMember, oneView, initialStatus, addableUsers, logEvent };
 }
 
 /** `db.execute` returns snake_case columns; map back to the Drizzle row shape. */

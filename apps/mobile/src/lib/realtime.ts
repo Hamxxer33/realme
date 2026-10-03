@@ -8,6 +8,8 @@ export type RealtimeEvent =
   | { type: 'typing'; conversationId: string; userId: string }
   | { type: 'conversation_changed'; conversationId: string }
   | { type: 'status_changed'; authorId: string }
+  | { type: 'channel_post'; channelId: string }
+  | { type: 'community_changed'; communityId: string }
   | { type: 'connected' };
 
 type Listener = (event: RealtimeEvent) => void;

@@ -13,6 +13,7 @@ import type { DB } from '../src/db/client';
 import * as schema from '../src/db/schema';
 import type { Storage } from '../src/storage';
 
+const crypto_uuid = () => globalThis.crypto.randomUUID();
 const FAST = { opsLimit: 1, memLimit: 8192 * 4 };
 let crypto: ReturnType<typeof createCrypto>;
 
@@ -524,6 +525,109 @@ describe('status', () => {
     expect((await ctx.call('GET', '/status', { as: ben })).body.recent).toEqual([]);
     expect((await ctx.call('GET', '/status', { as: ana })).body.mine).toBeNull();
     expect(ctx.deletedPrefixes).toContain(`status/${ana.id}/${posted.clientId}/`);
+  });
+});
+
+describe('channels', () => {
+  it('owner posts; anyone follows, reads and reacts; followers get unread counts live', async () => {
+    const [ana, ben] = [await ctx.signup('ana'), await ctx.signup('ben')];
+    const created = await ctx.call('POST', '/channels', { as: ana, body: { name: 'Lisbon Eats', description: 'Where to eat in Lisbon' } });
+    expect(created.status).toBe(201);
+    const id = created.body.channel.id;
+
+    // Discoverable by search; Ben follows.
+    expect((await ctx.call('GET', '/channels?q=eats', { as: ben })).body.channels.map((c: any) => c.name)).toEqual(['Lisbon Eats']);
+    expect((await ctx.call('POST', `/channels/${id}/follow`, { as: ben })).body.channel).toMatchObject({ following: true, followerCount: 1 });
+    expect((await ctx.call('POST', `/channels/${id}/follow`, { as: ana })).status).toBe(400);
+
+    // Only the owner posts; photos must be the owner's own public uploads.
+    ctx.advance(1000);
+    expect((await ctx.call('POST', `/channels/${id}/posts`, { as: ben, body: { text: 'hijack' } })).status).toBe(404);
+    expect((await ctx.call('POST', `/channels/${id}/posts`, { as: ana, body: { text: '', media: { objectKey: `posts/${ben.id}/${crypto_uuid()}`, width: 10, height: 10 } } })).status).toBe(400);
+    const post = (await ctx.call('POST', `/channels/${id}/posts`, { as: ana, body: { text: 'Best pastéis: Manteigaria 🥐' } })).body.post;
+
+    const following = (await ctx.call('GET', '/channels/following', { as: ben })).body.channels;
+    expect(following[0]).toMatchObject({ name: 'Lisbon Eats', unreadCount: 1, lastPost: { text: 'Best pastéis: Manteigaria 🥐' } });
+    await ctx.call('PATCH', `/channels/${id}/me`, { as: ben, body: { seen: true } });
+    expect((await ctx.call('GET', '/channels/following', { as: ben })).body.channels[0].unreadCount).toBe(0);
+
+    // One reaction per person; can change or remove it.
+    const react = (emoji: string | null) => ctx.call('PUT', `/channels/${id}/posts/${post.id}/reaction`, { as: ben, body: { emoji } });
+    expect((await react('❤️')).body.post).toMatchObject({ reactions: { '❤️': 1 }, myReaction: '❤️' });
+    expect((await react('🙏')).body.post.reactions).toEqual({ '🙏': 1 });
+    expect((await react(null)).body.post.reactions).toEqual({});
+    expect((await ctx.call('PUT', `/channels/${id}/posts/${post.id}/reaction`, { as: ben, body: { emoji: '💩' } })).status).toBe(400);
+
+    // Blocking hides the channel both ways.
+    await ctx.call('POST', '/blocks', { as: ana, body: { userId: ben.id } });
+    expect((await ctx.call('GET', `/channels/${id}`, { as: ben })).status).toBe(404);
+    expect((await ctx.call('GET', '/channels?q=eats', { as: ben })).body.channels).toEqual([]);
+  });
+
+  it('deleting a channel removes its posts and their photos', async () => {
+    const ana = await ctx.signup('ana');
+    const id = (await ctx.call('POST', '/channels', { as: ana, body: { name: 'Pics' } })).body.channel.id;
+    const objectKey = `posts/${ana.id}/${crypto_uuid()}`;
+    await ctx.call('POST', `/channels/${id}/posts`, { as: ana, body: { text: '', media: { objectKey, width: 10, height: 10 } } });
+    expect((await ctx.call('DELETE', `/channels/${id}`, { as: ana })).status).toBe(200);
+    expect(await ctx.db.select().from(schema.channelPosts)).toEqual([]);
+    expect(ctx.deletedPrefixes).toContain(objectKey);
+  });
+});
+
+describe('communities', () => {
+  it('has an announcements group only admins post to, and groups members can join', async () => {
+    const [ana, ben, cat] = [await ctx.signup('ana'), await ctx.signup('ben'), await ctx.signup('cat')];
+    const dm = await ctx.direct(ana, ben);
+    await ctx.send(ana, dm, { kind: 'text', text: 'hi' });
+    await ctx.call('POST', `/conversations/${dm}/accept`, { as: ben });
+
+    const created = await ctx.call('POST', '/communities', { as: ana, body: { name: 'Book club', description: 'Monthly reads', memberIds: [ben.id] } });
+    expect(created.status).toBe(201);
+    const community = created.body.community;
+    expect(community).toMatchObject({ name: 'Book club', myRole: 'admin', memberCount: 2, groups: [] });
+
+    // Announcements: Ben reads, only admins post.
+    const ann = (await ctx.call('GET', `/conversations/${community.announcementsId}`, { as: ben })).body.conversation;
+    expect(ann).toMatchObject({ announcements: true, adminsOnlyMessages: true, community: { id: community.id, name: 'Book club' } });
+    expect((await ctx.send(ben, ann.id, { kind: 'text', text: 'hi all' })).status).toBe(403);
+    expect((await ctx.send(ana, ann.id, { kind: 'text', text: 'Welcome!' })).status).toBe(201);
+    expect((await ctx.call('PATCH', `/conversations/${ann.id}`, { as: ana, body: { adminsOnlyMessages: false } })).status).toBe(400);
+
+    // Groups: only community members can be invited; members can join themselves.
+    expect((await ctx.call('POST', `/communities/${community.id}/groups`, { as: ana, body: { title: 'Sci-fi', memberIds: [cat.id] } })).status).toBe(400);
+    const made = await ctx.call('POST', `/communities/${community.id}/groups`, { as: ana, body: { title: 'Sci-fi' } });
+    expect(made.status).toBe(201);
+    const groupId = made.body.conversation.id;
+    expect((await ctx.call('GET', `/communities/${community.id}`, { as: ben })).body.community.groups)
+      .toEqual([{ id: groupId, title: 'Sci-fi', description: '', memberCount: 1, joined: false }]);
+    expect((await ctx.call('POST', `/communities/${community.id}/groups/${groupId}/join`, { as: cat })).status).toBe(404);
+    const joined = await ctx.call('POST', `/communities/${community.id}/groups/${groupId}/join`, { as: ben });
+    expect(joined.body.conversation.members).toHaveLength(2);
+    const events = (await ctx.call('GET', `/conversations/${groupId}/events`, { as: ana })).body.events;
+    expect(events.at(-1)).toMatchObject({ kind: 'joined', actor: { id: ben.id } });
+
+    // Bring in an existing group; non-admins can't.
+    const book = (await ctx.call('POST', '/conversations/group', { as: ben, body: { title: 'Fantasy', memberIds: [ana.id] } })).body.conversation;
+    expect((await ctx.call('POST', `/communities/${community.id}/groups/link`, { as: ben, body: { conversationId: book.id } })).status).toBe(403);
+    expect((await ctx.call('POST', `/communities/${community.id}/groups/link`, { as: ana, body: { conversationId: book.id } })).status).toBe(403);
+    await ctx.call('PATCH', `/conversations/${book.id}/members/${ana.id}`, { as: ben, body: { role: 'admin' } });
+    expect((await ctx.call('POST', `/communities/${community.id}/groups/link`, { as: ana, body: { conversationId: book.id } })).body.community.groups).toHaveLength(2);
+
+    // Leaving the community leaves its groups too; outsiders see nothing.
+    await ctx.call('DELETE', `/communities/${community.id}/membership`, { as: ben });
+    expect((await ctx.call('GET', `/communities/${community.id}`, { as: ben })).status).toBe(404);
+    expect((await ctx.call('GET', `/conversations/${groupId}`, { as: ben })).status).toBe(404);
+    expect((await ctx.call('GET', '/communities', { as: ben })).body.communities).toEqual([]);
+  });
+
+  it('closes when the last member leaves; its groups live on', async () => {
+    const ana = await ctx.signup('ana');
+    const community = (await ctx.call('POST', '/communities', { as: ana, body: { name: 'Solo' } })).body.community;
+    const group = (await ctx.call('POST', `/communities/${community.id}/groups`, { as: ana, body: { title: 'Notes' } })).body.conversation;
+    await ctx.call('DELETE', `/conversations/${community.announcementsId}/membership`, { as: ana });
+    expect(await ctx.db.select().from(schema.communities)).toEqual([]);
+    expect((await ctx.call('GET', `/conversations/${group.id}`, { as: ana })).body.conversation.community).toBeNull();
   });
 });
 

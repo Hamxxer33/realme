@@ -19,6 +19,8 @@ export interface ReportTarget {
   postId?: string;
   commentId?: string;
   conversationId?: string;
+  channelId?: string;
+  channelPostId?: string;
   label: string; // "@ben", "this post"…
 }
 
