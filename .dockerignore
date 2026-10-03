@@ -1,0 +1,7 @@
+**/node_modules
+**/.env
+**/.expo
+apps/server/.media
+design-systems
+docs
+.claude
