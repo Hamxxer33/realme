@@ -1,22 +1,27 @@
 /**
  * End-to-end encryption for Realme.
  *
- * Every user has an X25519 key pair generated on their device. A couple's
- * messages are sealed with `crypto_box` using one partner's secret key and the
- * other's public key. Because X25519 is symmetric, either partner can open any
- * message in the conversation (including their own), while the server — which
- * only ever sees ciphertext — can open none.
+ * Every user has an X25519 key pair generated on their device; the server only
+ * ever sees public keys and ciphertext.
  *
- * Photos and voice notes are encrypted with a fresh random key per file
- * (XChaCha20-Poly1305); that key travels inside the encrypted message.
+ * Messages (1:1 and group) use a fresh random key per message:
+ *   1. The body is encrypted with that key (XChaCha20-Poly1305).
+ *   2. The key is sealed for every member — including the sender — with
+ *      `crypto_box(senderSecret, memberPublic)`, together with a hash of the
+ *      ciphertext. Opening a member's copy proves who sent it (only the sender's
+ *      secret key can produce it) and that the ciphertext wasn't swapped.
+ * So a member can read a message only if they were a member when it was sent,
+ * and neither the server nor another member can forge one in someone's name.
  *
- * The secret key is backed up to the server encrypted under a key derived from
- * the user's password (Argon2id), so a new phone can restore it. The password
- * itself never leaves the device: the server only receives a separate
- * authentication secret derived from the same master key.
+ * Photos and voice notes are encrypted with their own random key per file; that
+ * key travels inside the (encrypted) message body.
+ *
+ * The secret key is backed up to the server wrapped with a key derived from the
+ * user's password (Argon2id). The password never leaves the device: the server
+ * receives a separate authentication secret derived from the same master key.
  *
  * Sodium is injected so the same code runs on react-native-libsodium (app) and
- * libsodium-wrappers-sumo (Node tests). Call sites must await `sodium.ready`.
+ * libsodium-wrappers-sumo (Node). Call sites must await `sodium.ready`.
  */
 
 export interface Sodium {
@@ -34,7 +39,7 @@ export interface Sodium {
   crypto_secretbox_easy(message: string | Uint8Array, nonce: Uint8Array, key: Uint8Array): Uint8Array;
   crypto_secretbox_open_easy(ciphertext: Uint8Array, nonce: Uint8Array, key: Uint8Array): Uint8Array;
   crypto_aead_xchacha20poly1305_ietf_encrypt(
-    message: Uint8Array,
+    message: string | Uint8Array,
     additionalData: string | null,
     secretNonce: null,
     publicNonce: Uint8Array,
@@ -74,6 +79,17 @@ export interface Sealed {
   ciphertext: string;
 }
 
+/** One member's copy of a message key. */
+export interface WrappedKey {
+  nonce: string;
+  key: string;
+}
+
+/** What gets sent to the server: one ciphertext plus a wrapped key per member. */
+export interface EncryptedMessage extends Sealed {
+  keys: Record<string, WrappedKey>;
+}
+
 export type MessageBody =
   | { kind: 'text'; text: string }
   | { kind: 'image'; media: MediaRef; caption?: string }
@@ -91,10 +107,10 @@ export interface MediaRef {
   height?: number;
 }
 
-/** What is actually encrypted: the body plus who sent it to whom, so the server can't relabel a message. */
+/** Sealed inside the ciphertext so the server can't move a message between chats or senders. */
 interface Envelope<T> {
-  v: 1;
-  coupleId: string;
+  v: 2;
+  conversationId: string;
   senderId: string;
   body: T;
 }
@@ -106,10 +122,14 @@ export class DecryptionError extends Error {
   }
 }
 
+const MESSAGE_AD = 'realme-message-v2';
 const MEDIA_AD = 'realme-media-v1';
 const KDF_CONTEXT = 'realmekd'; // crypto_kdf contexts are exactly 8 bytes
 const AUTH_SUBKEY_ID = 1;
 const BACKUP_SUBKEY_ID = 2;
+const KEY_BYTES = 32;
+const HASH_BYTES = 32;
+export const MAX_RECIPIENTS = 64;
 
 export interface PasswordCost {
   opsLimit: number;
@@ -144,49 +164,74 @@ export function createCrypto(sodium: Sodium) {
     return { publicKey: b64(publicKey), secretKey: b64(privateKey) };
   }
 
-  function seal<T>(value: T, mySecretKey: string, partnerPublicKey: string): Sealed {
-    const nonce = sodium.randombytes_buf(sodium.crypto_box_NONCEBYTES);
-    const ciphertext = sodium.crypto_box_easy(JSON.stringify(value), nonce, unb64(partnerPublicKey), unb64(mySecretKey));
-    return { nonce: b64(nonce), ciphertext: b64(ciphertext) };
+  const ciphertextHash = (nonce: Uint8Array, ciphertext: Uint8Array) => {
+    const joined = new Uint8Array(nonce.length + ciphertext.length);
+    joined.set(nonce);
+    joined.set(ciphertext, nonce.length);
+    return sodium.crypto_generichash(HASH_BYTES, joined, null);
+  };
+
+  /**
+   * Encrypt a message for every member of a conversation. `recipients` maps
+   * user id → public key and must include the sender, so they can read their
+   * own history on another device.
+   */
+  function encryptMessage<T>(
+    body: T,
+    ctx: { conversationId: string; senderId: string; mySecretKey: string; recipients: Record<string, string> },
+  ): EncryptedMessage {
+    const ids = Object.keys(ctx.recipients);
+    if (!ids.includes(ctx.senderId)) throw new Error('Recipients must include the sender');
+    if (ids.length > MAX_RECIPIENTS) throw new Error('Too many recipients');
+
+    const envelope: Envelope<T> = { v: 2, conversationId: ctx.conversationId, senderId: ctx.senderId, body };
+    const messageKey = sodium.crypto_aead_xchacha20poly1305_ietf_keygen();
+    const nonce = sodium.randombytes_buf(sodium.crypto_aead_xchacha20poly1305_ietf_NPUBBYTES);
+    const ciphertext = sodium.crypto_aead_xchacha20poly1305_ietf_encrypt(
+      JSON.stringify(envelope), MESSAGE_AD, null, nonce, messageKey,
+    );
+
+    // Each member's copy = messageKey ‖ hash(nonce ‖ ciphertext), boxed sender → member.
+    const keyAndHash = new Uint8Array(KEY_BYTES + HASH_BYTES);
+    keyAndHash.set(messageKey);
+    keyAndHash.set(ciphertextHash(nonce, ciphertext), KEY_BYTES);
+
+    const mySecret = unb64(ctx.mySecretKey);
+    const keys: Record<string, WrappedKey> = {};
+    for (const [userId, publicKey] of Object.entries(ctx.recipients)) {
+      const wrapNonce = sodium.randombytes_buf(sodium.crypto_box_NONCEBYTES);
+      keys[userId] = {
+        nonce: b64(wrapNonce),
+        key: b64(sodium.crypto_box_easy(keyAndHash, wrapNonce, unb64(publicKey), mySecret)),
+      };
+    }
+    return { nonce: b64(nonce), ciphertext: b64(ciphertext), keys };
   }
 
-  function open<T>(sealed: Sealed, mySecretKey: string, partnerPublicKey: string): T {
-    let plaintext: Uint8Array;
+  /** Open a message using my copy of its key and the claimed sender's public key. */
+  function decryptMessage<T>(
+    message: Sealed & { key: WrappedKey },
+    ctx: { conversationId: string; senderId: string; senderPublicKey: string; mySecretKey: string },
+  ): T {
     try {
-      plaintext = sodium.crypto_box_open_easy(
-        unb64(sealed.ciphertext),
-        unb64(sealed.nonce),
-        unb64(partnerPublicKey),
-        unb64(mySecretKey),
+      const nonce = unb64(message.nonce);
+      const ciphertext = unb64(message.ciphertext);
+      const keyAndHash = sodium.crypto_box_open_easy(
+        unb64(message.key.key), unb64(message.key.nonce), unb64(ctx.senderPublicKey), unb64(ctx.mySecretKey),
       );
+      if (keyAndHash.length !== KEY_BYTES + HASH_BYTES) throw new Error('bad key');
+      if (!equal(keyAndHash.subarray(KEY_BYTES), ciphertextHash(nonce, ciphertext))) throw new Error('hash mismatch');
+      const plain = sodium.crypto_aead_xchacha20poly1305_ietf_decrypt(
+        null, ciphertext, MESSAGE_AD, nonce, keyAndHash.subarray(0, KEY_BYTES),
+      );
+      const envelope = JSON.parse(sodium.to_string(plain)) as Envelope<T>;
+      if (envelope.v !== 2 || envelope.conversationId !== ctx.conversationId || envelope.senderId !== ctx.senderId) {
+        throw new Error('metadata mismatch');
+      }
+      return envelope.body;
     } catch {
       throw new DecryptionError();
     }
-    return JSON.parse(sodium.to_string(plaintext)) as T;
-  }
-
-  /**
-   * Encrypt a couple-scoped record (message, memory, settings). The couple and
-   * sender ids are sealed inside and checked on open, so ciphertext can't be
-   * replayed into another couple or attributed to the other partner.
-   */
-  function encryptForCouple<T>(
-    body: T,
-    ctx: { coupleId: string; senderId: string; mySecretKey: string; partnerPublicKey: string },
-  ): Sealed {
-    const envelope: Envelope<T> = { v: 1, coupleId: ctx.coupleId, senderId: ctx.senderId, body };
-    return seal(envelope, ctx.mySecretKey, ctx.partnerPublicKey);
-  }
-
-  function decryptForCouple<T>(
-    sealed: Sealed,
-    ctx: { coupleId: string; senderId: string; mySecretKey: string; partnerPublicKey: string },
-  ): T {
-    const envelope = open<Envelope<T>>(sealed, ctx.mySecretKey, ctx.partnerPublicKey);
-    if (envelope.v !== 1 || envelope.coupleId !== ctx.coupleId || envelope.senderId !== ctx.senderId) {
-      throw new DecryptionError('Message metadata does not match');
-    }
-    return envelope.body;
   }
 
   function encryptFile(bytes: Uint8Array): { ciphertext: Uint8Array; fileKey: string; nonce: string } {
@@ -250,9 +295,9 @@ export function createCrypto(sodium: Sodium) {
   }
 
   /**
-   * A short code both partners can compare in person. It is the same on both
-   * phones only if each holds the other's real public key, which rules out a
-   * server swapping keys to read messages.
+   * A short code two people can compare in person. It matches on both phones
+   * only if each holds the other's real public key, which rules out a server
+   * swapping keys to read messages.
    */
   function safetyNumber(publicKeyA: string, publicKeyB: string): string {
     const [first, second] = [publicKeyA, publicKeyB].sort();
@@ -267,8 +312,8 @@ export function createCrypto(sodium: Sodium) {
 
   return {
     generateKeyPair,
-    encryptForCouple,
-    decryptForCouple,
+    encryptMessage,
+    decryptMessage,
     encryptFile,
     decryptFile,
     derivePasswordSecrets,
@@ -279,3 +324,11 @@ export function createCrypto(sodium: Sodium) {
 }
 
 export type RealmeCrypto = ReturnType<typeof createCrypto>;
+
+function equal(a: Uint8Array, b: Uint8Array) {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a[i]! ^ b[i]!;
+  return diff === 0;
+}
+

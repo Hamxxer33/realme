@@ -1,12 +1,10 @@
 import type { WSContext } from 'hono/ws';
 
 export type ServerEvent =
-  | { type: 'message'; message: unknown }
-  | { type: 'read'; readerId: string; readAt: string; upTo: string }
-  | { type: 'typing'; userId: string }
-  | { type: 'memory'; memory: unknown }
-  | { type: 'memory_deleted'; id: string }
-  | { type: 'couple_changed' };
+  | { type: 'message'; conversationId: string; message: unknown }
+  | { type: 'read'; conversationId: string; userId: string; lastReadAt: string }
+  | { type: 'typing'; conversationId: string; userId: string }
+  | { type: 'conversation_changed'; conversationId: string };
 
 /** Tracks open sockets per user. Single-process; see README for scaling past one instance. */
 export class Hub {
@@ -28,16 +26,22 @@ export class Hub {
     return (this.sockets.get(userId)?.size ?? 0) > 0;
   }
 
-  send(userIds: Array<string | null | undefined>, event: ServerEvent) {
+  send(userIds: Iterable<string | null | undefined>, event: ServerEvent) {
     const payload = JSON.stringify(event);
-    for (const id of userIds) {
-      if (!id) continue;
-      for (const ws of this.sockets.get(id) ?? []) {
-        try {
-          ws.send(payload);
-        } catch {
-          // Socket is closing; its close handler will clean up.
-        }
+    for (const id of userIds) if (id) this.write(id, payload);
+  }
+
+  /** Per-recipient payloads, e.g. a message carrying only that member's key. */
+  sendEach(userIds: Iterable<string>, build: (userId: string) => ServerEvent) {
+    for (const id of userIds) if (this.isOnline(id)) this.write(id, JSON.stringify(build(id)));
+  }
+
+  private write(userId: string, payload: string) {
+    for (const ws of this.sockets.get(userId) ?? []) {
+      try {
+        ws.send(payload);
+      } catch {
+        // Socket is closing; its close handler will clean up.
       }
     }
   }

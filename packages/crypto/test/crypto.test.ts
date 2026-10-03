@@ -1,6 +1,6 @@
 import sodiumLib from 'libsodium-wrappers-sumo';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { createCrypto, DecryptionError, type MessageBody, type RealmeCrypto, type Sodium } from '../src/index';
+import { createCrypto, DecryptionError, type EncryptedMessage, type KeyPair, type MessageBody, type RealmeCrypto, type Sodium } from '../src/index';
 
 let c: RealmeCrypto;
 let sodium: typeof sodiumLib;
@@ -12,80 +12,74 @@ beforeAll(async () => {
   c = createCrypto(sodiumLib as unknown as Sodium);
 });
 
-describe('couple messages', () => {
-  it('either partner can read every message, including their own', () => {
-    const alice = c.generateKeyPair();
-    const bob = c.generateKeyPair();
-    const body: MessageBody = { kind: 'text', text: 'goodnight, love 🌙' };
+type Person = { id: string } & KeyPair;
+const person = (id: string): Person => ({ id, ...c.generateKeyPair() });
+const recipientsOf = (...people: Person[]) => Object.fromEntries(people.map((p) => [p.id, p.publicKey]));
 
-    const sealed = c.encryptForCouple(body, {
-      coupleId: 'c1',
-      senderId: 'alice',
-      mySecretKey: alice.secretKey,
-      partnerPublicKey: bob.publicKey,
-    });
+function send(from: Person, members: Person[], body: MessageBody, conversationId = 'conv1') {
+  return c.encryptMessage(body, { conversationId, senderId: from.id, mySecretKey: from.secretKey, recipients: recipientsOf(...members) });
+}
+function read(as: Person, from: Person, msg: EncryptedMessage, conversationId = 'conv1') {
+  const key = msg.keys[as.id];
+  if (!key) throw new DecryptionError('no key for me');
+  return c.decryptMessage<MessageBody>({ ...msg, key }, {
+    conversationId, senderId: from.id, senderPublicKey: from.publicKey, mySecretKey: as.secretKey,
+  });
+}
 
-    const asBob = c.decryptForCouple<MessageBody>(sealed, {
-      coupleId: 'c1',
-      senderId: 'alice',
-      mySecretKey: bob.secretKey,
-      partnerPublicKey: alice.publicKey,
-    });
-    const asAlice = c.decryptForCouple<MessageBody>(sealed, {
-      coupleId: 'c1',
-      senderId: 'alice',
-      mySecretKey: alice.secretKey,
-      partnerPublicKey: bob.publicKey,
-    });
-    expect(asBob).toEqual(body);
-    expect(asAlice).toEqual(body);
-    expect(sealed.ciphertext).not.toContain('goodnight');
+describe('messages', () => {
+  it('every member of a group can read, including the sender', () => {
+    const [ana, ben, cat] = [person('ana'), person('ben'), person('cat')];
+    const body: MessageBody = { kind: 'text', text: 'dinner at 8? 🍝' };
+    const msg = send(ana, [ana, ben, cat], body);
+    expect(Object.keys(msg.keys).sort()).toEqual(['ana', 'ben', 'cat']);
+    for (const p of [ana, ben, cat]) expect(read(p, ana, msg)).toEqual(body);
+    expect(msg.ciphertext).not.toContain('dinner');
   });
 
-  it('an outsider cannot read the message', () => {
-    const alice = c.generateKeyPair();
-    const bob = c.generateKeyPair();
-    const eve = c.generateKeyPair();
-    const sealed = c.encryptForCouple({ kind: 'nudge' }, {
-      coupleId: 'c1',
-      senderId: 'alice',
-      mySecretKey: alice.secretKey,
-      partnerPublicKey: bob.publicKey,
-    });
-    expect(() =>
-      c.decryptForCouple(sealed, { coupleId: 'c1', senderId: 'alice', mySecretKey: eve.secretKey, partnerPublicKey: alice.publicKey }),
-    ).toThrow(DecryptionError);
+  it('works for a 1:1 chat', () => {
+    const [ana, ben] = [person('ana'), person('ben')];
+    const msg = send(ben, [ana, ben], { kind: 'nudge' });
+    expect(read(ana, ben, msg)).toEqual({ kind: 'nudge' });
   });
 
-  it('rejects a message relabelled with another sender or couple', () => {
-    const alice = c.generateKeyPair();
-    const bob = c.generateKeyPair();
-    const sealed = c.encryptForCouple({ kind: 'text', text: 'hi' }, {
-      coupleId: 'c1',
-      senderId: 'alice',
-      mySecretKey: alice.secretKey,
-      partnerPublicKey: bob.publicKey,
-    });
-    const ctx = { mySecretKey: bob.secretKey, partnerPublicKey: alice.publicKey };
-    expect(() => c.decryptForCouple(sealed, { ...ctx, coupleId: 'c1', senderId: 'bob' })).toThrow(DecryptionError);
-    expect(() => c.decryptForCouple(sealed, { ...ctx, coupleId: 'c2', senderId: 'alice' })).toThrow(DecryptionError);
+  it('a non-member cannot read it, even with a member\'s key copy', () => {
+    const [ana, ben, eve] = [person('ana'), person('ben'), person('eve')];
+    const msg = send(ana, [ana, ben], { kind: 'text', text: 'secret' });
+    expect(() => c.decryptMessage({ ...msg, key: msg.keys.ben! }, {
+      conversationId: 'conv1', senderId: 'ana', senderPublicKey: ana.publicKey, mySecretKey: eve.secretKey,
+    })).toThrow(DecryptionError);
   });
 
-  it('rejects tampered ciphertext', () => {
-    const alice = c.generateKeyPair();
-    const bob = c.generateKeyPair();
-    const sealed = c.encryptForCouple({ kind: 'text', text: 'hi' }, {
-      coupleId: 'c1',
-      senderId: 'alice',
-      mySecretKey: alice.secretKey,
-      partnerPublicKey: bob.publicKey,
+  it('a member cannot forge a message in someone else\'s name', () => {
+    const [ana, ben, cat] = [person('ana'), person('ben'), person('cat')];
+    // Ben encrypts but claims Ana sent it.
+    const forged = c.encryptMessage<MessageBody>({ kind: 'text', text: 'from ana (not really)' }, {
+      conversationId: 'conv1', senderId: 'ana', mySecretKey: ben.secretKey, recipients: recipientsOf(ana, ben, cat),
     });
-    const bytes = sodium.from_base64(sealed.ciphertext);
-    bytes[0] = bytes[0]! ^ 1;
-    const tampered = { ...sealed, ciphertext: sodium.to_base64(bytes) };
-    expect(() =>
-      c.decryptForCouple(tampered, { coupleId: 'c1', senderId: 'alice', mySecretKey: bob.secretKey, partnerPublicKey: alice.publicKey }),
-    ).toThrow(DecryptionError);
+    expect(() => read(cat, ana, forged)).toThrow(DecryptionError);
+  });
+
+  it('rejects a swapped ciphertext reusing someone\'s genuine key copies', () => {
+    const [ana, ben, cat] = [person('ana'), person('ben'), person('cat')];
+    const genuine = send(ana, [ana, ben, cat], { kind: 'text', text: 'hi' });
+    // Ben knows the message key (he's a member) and re-encrypts new content under it,
+    // then a malicious server pairs it with Ana's genuine key copy for Cat.
+    const other = send(ben, [ana, ben, cat], { kind: 'text', text: 'evil' });
+    const spliced = { ...genuine, ciphertext: other.ciphertext, nonce: other.nonce };
+    expect(() => read(cat, ana, spliced)).toThrow(DecryptionError);
+  });
+
+  it('rejects a message moved to another conversation or relabelled', () => {
+    const [ana, ben] = [person('ana'), person('ben')];
+    const msg = send(ana, [ana, ben], { kind: 'text', text: 'hi' });
+    expect(() => read(ben, ana, msg, 'conv2')).toThrow(DecryptionError);
+    expect(() => read(ben, ben, msg)).toThrow(DecryptionError);
+  });
+
+  it('requires the sender among recipients', () => {
+    const [ana, ben] = [person('ana'), person('ben')];
+    expect(() => send(ana, [ben], { kind: 'nudge' })).toThrow('include the sender');
   });
 });
 
