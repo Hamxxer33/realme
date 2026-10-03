@@ -90,6 +90,11 @@ export interface EncryptedMessage extends Sealed {
   keys: Record<string, WrappedKey>;
 }
 
+/** A status update. `conversationId` for its envelope is `status:<clientId>`. */
+export type StatusBody =
+  | { kind: 'text'; text: string; background: string }
+  | { kind: 'image'; media: MediaRef; caption?: string };
+
 export type MessageBody =
   | { kind: 'text'; text: string }
   | { kind: 'image'; media: MediaRef; caption?: string }
@@ -178,11 +183,18 @@ export function createCrypto(sodium: Sodium) {
    */
   function encryptMessage<T>(
     body: T,
-    ctx: { conversationId: string; senderId: string; mySecretKey: string; recipients: Record<string, string> },
+    ctx: {
+      conversationId: string;
+      senderId: string;
+      mySecretKey: string;
+      recipients: Record<string, string>;
+      /** Defaults to MAX_RECIPIENTS (group size); status updates allow more. */
+      maxRecipients?: number;
+    },
   ): EncryptedMessage {
     const ids = Object.keys(ctx.recipients);
     if (!ids.includes(ctx.senderId)) throw new Error('Recipients must include the sender');
-    if (ids.length > MAX_RECIPIENTS) throw new Error('Too many recipients');
+    if (ids.length > (ctx.maxRecipients ?? MAX_RECIPIENTS)) throw new Error('Too many recipients');
 
     const envelope: Envelope<T> = { v: 2, conversationId: ctx.conversationId, senderId: ctx.senderId, body };
     const messageKey = sodium.crypto_aead_xchacha20poly1305_ietf_keygen();

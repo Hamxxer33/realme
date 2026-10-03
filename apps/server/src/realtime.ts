@@ -4,7 +4,8 @@ export type ServerEvent =
   | { type: 'message'; conversationId: string; message: unknown }
   | { type: 'read'; conversationId: string; userId: string; lastReadAt: string }
   | { type: 'typing'; conversationId: string; userId: string }
-  | { type: 'conversation_changed'; conversationId: string };
+  | { type: 'conversation_changed'; conversationId: string }
+  | { type: 'status_changed'; authorId: string };
 
 /** Tracks open sockets per user. Single-process; see README for scaling past one instance. */
 export class Hub {

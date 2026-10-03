@@ -11,6 +11,8 @@ export async function uploadEncrypted(
   localUri: string,
   meta: { mime: string; width?: number; height?: number },
   conversationId: string,
+  /** For status photos: stored under the status so it expires with it. */
+  statusClientId?: string,
 ): Promise<MediaRef> {
   const c = await getCrypto();
   const plain = await new File(localUri).bytes();
@@ -18,7 +20,7 @@ export async function uploadEncrypted(
 
   const { objectKey, url } = await api<{ objectKey: string; url: string }>('POST', '/media/upload-url', {
     size: ciphertext.length,
-    conversationId,
+    ...(statusClientId ? { statusClientId } : { conversationId }),
   });
   const tmp = new File(Paths.cache, `upload-${Date.now()}.bin`);
   tmp.write(ciphertext);

@@ -34,7 +34,7 @@ export default function TabsLayout() {
           tabBarBadgeStyle: { backgroundColor: colors.roseFill, fontFamily: fonts.bold, fontSize: 11 },
         }}
       />
-      <Tabs.Screen name="timeline" options={{ title: 'Timeline', tabBarIcon: ({ color }) => <Icon name="feed" color={String(color)} /> }} />
+      <Tabs.Screen name="updates" options={{ title: 'Updates', tabBarIcon: ({ color }) => <Icon name="updates" color={String(color)} /> }} />
       <Tabs.Screen name="profile" options={{ title: 'You', tabBarIcon: ({ color }) => <Icon name="user" color={String(color)} /> }} />
     </Tabs>
   );

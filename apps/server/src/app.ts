@@ -12,6 +12,7 @@ import { registerAccounts } from './routes/accounts';
 import { registerChats } from './routes/chats';
 import { registerMedia } from './routes/media';
 import { registerSafety } from './routes/safety';
+import { registerStatus } from './routes/status';
 import { registerTimeline } from './routes/timeline';
 import type { Storage } from './storage';
 
@@ -45,7 +46,8 @@ export function createApp(deps: Deps) {
   registerChats(app, ctx);
   registerTimeline(app, ctx);
   registerSafety(app, ctx);
-  registerMedia(app, ctx);
+  const status = registerStatus(app, ctx);
+  registerMedia(app, ctx, status);
 
   // The token is sent as the first frame rather than in the URL so it never lands in access logs.
   app.get('/ws', upgradeWebSocket(() => {

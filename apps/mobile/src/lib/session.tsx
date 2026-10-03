@@ -20,6 +20,8 @@ interface SessionValue {
   setMe(me: Me): void;
   /** Encrypt for everyone currently in the conversation (including me). */
   encrypt<T>(conversation: ConversationView, body: T): EncryptedMessage;
+  /** Encrypt for an explicit list of people (status updates); `me` is always included. */
+  encryptFor<T>(conversationId: string, recipients: Array<{ id: string; publicKey: string }>, body: T): EncryptedMessage;
   /** Decrypt a message using my key copy and the sender's public key. */
   decrypt<T>(message: Sealed & { key: WrappedKey | null; conversationId: string; senderId: string }, senderPublicKey: string): T;
   /** Public key for a user, from a conversation's members or (for past members) the server. */
@@ -114,6 +116,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const recipients = Object.fromEntries(conversation.members.map((m) => [m.id, m.publicKey]));
       return crypto.encryptMessage(body, {
         conversationId: conversation.id, senderId: me.id, mySecretKey: secretKey.current, recipients,
+      });
+    },
+    encryptFor(conversationId, recipients, body) {
+      if (!crypto || !me || !secretKey.current) throw new Error('Not signed in');
+      const map = Object.fromEntries([[me.id, me.publicKey], ...recipients.map((r) => [r.id, r.publicKey])]);
+      return crypto.encryptMessage(body, {
+        conversationId, senderId: me.id, mySecretKey: secretKey.current, recipients: map, maxRecipients: 512,
       });
     },
     decrypt(message, senderPublicKey) {

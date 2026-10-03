@@ -117,3 +117,26 @@ export const reports = pgTable('reports', {
   createdAt: ts('created_at').notNull().defaultNow(),
   resolvedAt: ts('resolved_at'),
 });
+
+/** 24-hour status updates, encrypted like messages: one wrapped key per viewer. */
+export const statuses = pgTable('statuses', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  authorId: uuid('author_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  // The envelope is bound to `status:<clientId>`, so it can't be passed off as a chat message.
+  clientId: text('client_id').notNull(),
+  nonce: text('nonce').notNull(),
+  ciphertext: text('ciphertext').notNull(),
+  keys: jsonb('keys').$type<Record<string, { nonce: string; key: string }>>().notNull(),
+  createdAt: ts('created_at').notNull().defaultNow(),
+  expiresAt: ts('expires_at').notNull(),
+}, (t) => [
+  index('statuses_author_idx').on(t.authorId, t.createdAt),
+  index('statuses_expires_idx').on(t.expiresAt),
+  uniqueIndex('statuses_author_client_unique').on(t.authorId, t.clientId),
+]);
+
+export const statusViews = pgTable('status_views', {
+  statusId: uuid('status_id').notNull().references(() => statuses.id, { onDelete: 'cascade' }),
+  viewerId: uuid('viewer_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  viewedAt: ts('viewed_at').notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.statusId, t.viewerId] })]);

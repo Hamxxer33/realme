@@ -7,6 +7,7 @@ export type RealtimeEvent =
   | { type: 'read'; conversationId: string; userId: string; lastReadAt: string }
   | { type: 'typing'; conversationId: string; userId: string }
   | { type: 'conversation_changed'; conversationId: string }
+  | { type: 'status_changed'; authorId: string }
   | { type: 'connected' };
 
 type Listener = (event: RealtimeEvent) => void;

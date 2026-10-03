@@ -408,6 +408,75 @@ describe('privacy', () => {
   });
 });
 
+describe('status', () => {
+  async function contacts(a: Person, b: Person) {
+    const conv = await ctx.direct(a, b);
+    await ctx.call('POST', `/conversations/${conv}/accept`, { as: b });
+    return conv;
+  }
+  async function postStatus(author: Person, text: string, recipients?: Person[]) {
+    const audience = recipients ?? (await ctx.call('GET', '/status/audience', { as: author })).body.users;
+    const clientId = Math.random().toString(36).slice(2);
+    const enc = crypto.encryptMessage({ kind: 'text', text, background: '#C2385E' }, {
+      conversationId: `status:${clientId}`, senderId: author.id, mySecretKey: author.keys.secretKey, maxRecipients: 512,
+      recipients: Object.fromEntries([[author.id, author.keys.publicKey], ...audience.map((u: any) => [u.id, u.keys?.publicKey ?? u.publicKey])]),
+    });
+    return ctx.call('POST', '/status', { as: author, body: { ...enc, clientId } });
+  }
+
+  it('goes only to contacts, end-to-end encrypted, with a seen-by list', async () => {
+    const [ana, ben, cat] = [await ctx.signup('ana'), await ctx.signup('ben'), await ctx.signup('cat')];
+    await contacts(ana, ben);
+    expect((await ctx.call('GET', '/status/audience', { as: ana })).body.users.map((u: any) => u.username)).toEqual(['ben']);
+
+    const res = await postStatus(ana, 'sunset run 🌅');
+    expect(res.status).toBe(201);
+    const [row] = await ctx.db.select().from(schema.statuses);
+    expect(JSON.stringify(row)).not.toContain('sunset');
+
+    const feed = (await ctx.call('GET', '/status', { as: ben })).body;
+    expect(feed.recent).toHaveLength(1);
+    const item = feed.recent[0].items[0];
+    expect(crypto.decryptMessage({ ...item, key: item.key }, {
+      conversationId: `status:${item.clientId}`, senderId: ana.id, senderPublicKey: ana.keys.publicKey, mySecretKey: ben.keys.secretKey,
+    })).toEqual({ kind: 'text', text: 'sunset run 🌅', background: '#C2385E' });
+    expect((await ctx.call('GET', '/status', { as: cat })).body.recent).toEqual([]);
+
+    await ctx.call('POST', `/status/${item.id}/view`, { as: ben });
+    const after = (await ctx.call('GET', '/status', { as: ben })).body;
+    expect(after.recent).toEqual([]);
+    expect(after.viewed).toHaveLength(1);
+    expect((await ctx.call('GET', '/status', { as: ana })).body.mine.items[0].viewCount).toBe(1);
+    expect((await ctx.call('GET', `/status/${item.id}/views`, { as: ana })).body.viewers.map((v: any) => v.username)).toEqual(['ben']);
+    expect((await ctx.call('GET', `/status/${item.id}/views`, { as: ben })).status).toBe(404);
+  });
+
+  it('refuses to encrypt for non-contacts, and hides after a block', async () => {
+    const [ana, ben, cat] = [await ctx.signup('ana'), await ctx.signup('ben'), await ctx.signup('cat')];
+    await contacts(ana, ben);
+    expect((await postStatus(ana, 'hi', [ben, cat])).status).toBe(409);
+    await postStatus(ana, 'hi');
+    await ctx.call('POST', '/blocks', { as: ben, body: { userId: ana.id } });
+    expect((await ctx.call('GET', '/status', { as: ben })).body.recent).toEqual([]);
+  });
+
+  it('expires after 24 hours, taking its media with it', async () => {
+    const [ana, ben] = [await ctx.signup('ana'), await ctx.signup('ben')];
+    await contacts(ana, ben);
+    const posted = (await postStatus(ana, 'brb')).body.status;
+    const up = (await ctx.call('POST', '/media/upload-url', { as: ana, body: { size: 10, statusClientId: posted.clientId } })).body;
+    expect(up.objectKey).toMatch(new RegExp(`^status/${ana.id}/${posted.clientId}/`));
+    expect((await ctx.call('POST', '/media/download-url', { as: ben, body: { objectKey: up.objectKey } })).status).toBe(200);
+    const eve = await ctx.signup('eve');
+    expect((await ctx.call('POST', '/media/download-url', { as: eve, body: { objectKey: up.objectKey } })).status).toBe(404);
+
+    ctx.advance(25 * 3600 * 1000);
+    expect((await ctx.call('GET', '/status', { as: ben })).body.recent).toEqual([]);
+    expect((await ctx.call('GET', '/status', { as: ana })).body.mine).toBeNull();
+    expect(ctx.deletedPrefixes).toContain(`status/${ana.id}/${posted.clientId}/`);
+  });
+});
+
 describe('blocking and reporting', () => {
   it('blocking stops chats, search, profiles, group adds and posts — both ways', async () => {
     const [ana, ben, cat] = [await ctx.signup('ana'), await ctx.signup('ben'), await ctx.signup('cat')];

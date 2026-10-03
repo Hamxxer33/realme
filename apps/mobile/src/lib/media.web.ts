@@ -20,13 +20,14 @@ export async function uploadEncrypted(
   localUri: string,
   meta: { mime: string; width?: number; height?: number },
   conversationId: string,
+  statusClientId?: string,
 ): Promise<MediaRef> {
   const c = await getCrypto();
   const plain = await bytesOf(localUri);
   const { ciphertext, fileKey, nonce } = c.encryptFile(plain);
   const { objectKey, url } = await api<{ objectKey: string; url: string }>('POST', '/media/upload-url', {
     size: ciphertext.length,
-    conversationId,
+    ...(statusClientId ? { statusClientId } : { conversationId }),
   });
   await put(url, ciphertext);
   decrypted.set(objectKey, Promise.resolve(URL.createObjectURL(new Blob([plain as BlobPart], { type: meta.mime }))));

@@ -28,7 +28,11 @@ packages/crypto  End-to-end encryption shared by both (libsodium)
   lands in Requests. They can't tell you've seen it until you accept.
 - **Groups** — admins rename, add and remove people; leaving hands admin to
   someone else; the last person out deletes the group and its media.
+- **Status** — text or photo updates that disappear after 24 hours, shown to
+  people you have an accepted chat with. End-to-end encrypted; you see who viewed.
 - **Timeline** — public posts with an optional photo, likes and comments.
+- **Settings & dark mode** — system / light / dark, read-receipt privacy,
+  notification and account settings.
 - **Safety** — block (both directions: no chats, no group adds, hidden from
   search, profiles and the timeline) and report people, posts, comments or chats.
 
@@ -46,6 +50,8 @@ packages/crypto  End-to-end encryption shared by both (libsodium)
     between chats or relabelled.
 - **Photos and voice notes** in chats are encrypted on the phone with their own
   key, which travels inside the encrypted message.
+- **Status updates** are encrypted the same way, sealed for you plus each
+  contact at the moment you post. Someone you chat with later won't see it.
 - **The password never leaves the phone.** It's stretched with Argon2id into
   two secrets: one logs in (the server stores only an Argon2 hash of it), the
   other wraps a backup of the secret key — so signing in on a new phone
@@ -55,7 +61,7 @@ packages/crypto  End-to-end encryption shared by both (libsodium)
 
 **Not encrypted (by design):** timeline posts, comments and post photos are
 public. The server also sees usernames, who is in which chat, group names,
-message timestamps and sizes, read receipts, typing, and reports.
+message timestamps and sizes, read receipts, typing, who viewed a status, and reports.
 
 **Known limitations:**
 

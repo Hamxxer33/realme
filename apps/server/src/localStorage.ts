@@ -5,7 +5,7 @@ import type { Hono } from 'hono';
 import type { Storage } from './storage';
 
 const URL_TTL_SECONDS = 15 * 60;
-const KEY_PATTERN = /^(conversations|posts)\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/;
+const KEY_PATTERN = /^((conversations|posts)\/[0-9a-f-]{36}|status\/[0-9a-f-]{36}\/[A-Za-z0-9_-]{1,64})\/[0-9a-f-]{36}$/;
 
 /**
  * Development-only storage on local disk, so the stack runs without an S3

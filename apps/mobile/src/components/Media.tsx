@@ -20,6 +20,12 @@ function useDecrypted(media: MediaRef) {
   return { uri, failed };
 }
 
+/** Fills its parent, for previews that sit inside another pressable. */
+export function EncryptedCover({ media }: { media: MediaRef }) {
+  const { uri } = useDecrypted(media);
+  return uri ? <Image source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" transition={220} /> : null;
+}
+
 export function EncryptedImage({ media, maxWidth, onPress }: { media: MediaRef; maxWidth: number; onPress?: (uri: string) => void }) {
   const { uri, failed } = useDecrypted(media);
   const ratio = media.width && media.height ? media.width / media.height : 4 / 5;
