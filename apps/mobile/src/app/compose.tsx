@@ -10,7 +10,7 @@ import { Button, ErrorText, Screen } from '../components/ui';
 import { api } from '../lib/api';
 import { uploadPublic } from '../lib/media';
 import { useSession } from '../lib/session';
-import { colors, fonts, radius, space } from '../theme';
+import { noWebOutline, colors, fonts, radius, space } from '../theme';
 
 const MAX = 1000;
 
@@ -83,7 +83,7 @@ export default function Compose() {
 const styles = StyleSheet.create({
   container: { padding: space.lg, gap: space.md },
   row: { flexDirection: 'row', gap: space.md, alignItems: 'flex-start' },
-  input: { flex: 1, minHeight: 120, fontFamily: fonts.regular, fontSize: 18, lineHeight: 26, color: colors.ink, textAlignVertical: 'top', paddingTop: 8 },
+  input: { ...noWebOutline, flex: 1, minHeight: 120, fontFamily: fonts.regular, fontSize: 18, lineHeight: 26, color: colors.ink, textAlignVertical: 'top', paddingTop: 8 },
   photo: { width: '100%', maxHeight: 420, borderRadius: radius.lg, overflow: 'hidden', backgroundColor: colors.surfaceMuted },
   remove: { position: 'absolute', top: 10, right: 10, width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(46,30,36,0.55)', alignItems: 'center', justifyContent: 'center' },
   footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

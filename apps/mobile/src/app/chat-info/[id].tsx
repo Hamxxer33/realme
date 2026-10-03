@@ -1,35 +1,82 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState, type ReactNode } from 'react';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Avatar, GroupAvatar } from '../../components/Avatar';
-import { BackHeader } from '../../components/BackHeader';
 import { Icon, type IconName } from '../../components/Icon';
+import { EncryptedImage } from '../../components/Media';
 import { ReportSheet, type ReportTarget } from '../../components/ReportSheet';
-import { Button, Card, ErrorText, Field, Screen } from '../../components/ui';
-import { UserRow } from '../../components/UserRow';
+import { Button, ErrorText, Field, Screen } from '../../components/ui';
 import { api, type ConversationView } from '../../lib/api';
+import { emitChatEvent } from '../../lib/chatEvents';
 import { confirm, notify } from '../../lib/confirm';
-import { forget, upsert, useConversation } from '../../lib/conversations';
+import { forget, upsert, useConversation, useConversations } from '../../lib/conversations';
 import { conversationTitle, otherMembers } from '../../lib/format';
 import { useSession } from '../../lib/session';
-import { colors, fonts, space } from '../../theme';
+import { useChat } from '../../lib/useChat';
+import { colors, fonts, radius, shadow, space } from '../../theme';
 
-export default function ChatInfo() {
+export default function ChatInfoScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const conv = useConversation(id);
-  const { me, crypto } = useSession();
+  const { me } = useSession();
+  if (!conv || !me) return <Screen><Header onBack={() => router.back()} /></Screen>;
+  return <ChatInfo conv={conv} />;
+}
+
+function ChatInfo({ conv }: { conv: ConversationView }) {
+  const { me } = useSession();
+  const myId = me!.id;
+  const { chats } = useConversations();
+  const chat = useChat(conv);
   const [report, setReport] = useState<ReportTarget | null>(null);
   const [renaming, setRenaming] = useState(false);
-  const [title, setTitle] = useState(conv?.title ?? '');
+  const [title, setTitle] = useState(conv.title ?? '');
   const [error, setError] = useState<string | null>(null);
-  if (!conv || !me) return <Screen><BackHeader title="" /></Screen>;
 
-  const others = otherMembers(conv, me.id);
   const isGroup = conv.kind === 'group';
   const admin = conv.myRole === 'admin';
+  const others = otherMembers(conv, myId);
   const other = others[0];
-  const name = conversationTitle(conv, me.id);
-  const safety = !isGroup && other && crypto ? crypto.safetyNumber(me.publicKey, other.publicKey) : null;
+  const name = conversationTitle(conv, myId);
+
+  // Photos shared in this chat (from the history loaded on this device).
+  const photos = useMemo(
+    () => chat.messages.flatMap((m) => (m.body?.kind === 'image' ? [{ id: m.id, media: m.body.media }] : [])),
+    [chat.messages],
+  );
+  const groupsInCommon = useMemo(
+    () => (other ? (chats ?? []).filter((c) => c.kind === 'group' && c.members.some((m) => m.id === other.id)) : []),
+    [chats, other],
+  );
+
+  const setMuted = async (muted: boolean) => {
+    upsert({ ...conv, myMuted: muted });
+    try {
+      const { conversation } = await api<{ conversation: ConversationView }>('PATCH', `/conversations/${conv.id}/me`, { muted });
+      upsert(conversation);
+    } catch {
+      upsert({ ...conv, myMuted: !muted });
+      notify("Couldn't change notifications");
+    }
+  };
+
+  const search = () => {
+    emitChatEvent({ type: 'search', conversationId: conv.id });
+    router.back();
+  };
+
+  const clearChat = async () => {
+    const ok = await confirm('Clear this chat?', 'Messages will be removed from this chat for you. Others keep their copy.', 'Clear chat');
+    if (!ok) return;
+    try {
+      const { conversation } = await api<{ conversation: ConversationView }>('POST', `/conversations/${conv.id}/clear`);
+      upsert(conversation);
+      emitChatEvent({ type: 'cleared', conversationId: conv.id });
+    } catch {
+      notify("Couldn't clear chat");
+    }
+  };
 
   const rename = async () => {
     setError(null);
@@ -74,101 +121,274 @@ export default function ChatInfo() {
 
   return (
     <Screen>
-      <BackHeader title={isGroup ? 'Group info' : 'Chat info'} />
+      <Header onBack={() => router.back()} onEdit={isGroup && admin ? () => setRenaming((r) => !r) : undefined} />
       <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.hero}>
-          {isGroup
-            ? <GroupAvatar size={80} />
-            : <Avatar name={name} seed={other?.username ?? conv.id} size={80} />}
+        {/* Hero */}
+        <Animated.View entering={FadeInDown.springify().damping(20)} style={styles.hero}>
+          {isGroup ? <GroupAvatar size={112} /> : <Avatar name={name} seed={other?.username ?? conv.id} size={112} />}
           <Text accessibilityRole="header" style={styles.name}>{name}</Text>
-          {!isGroup && other ? (
-            <Pressable accessibilityRole="link" onPress={() => router.push(`/user/${other.username}`)}>
-              <Text style={styles.link}>@{other.username} · View profile</Text>
-            </Pressable>
-          ) : null}
-        </View>
+          <Text style={styles.sub}>
+            {isGroup ? `Group · ${conv.members.length} ${conv.members.length === 1 ? 'member' : 'members'}` : other ? `@${other.username}` : ''}
+          </Text>
+          {!isGroup && other?.bio ? <Text style={styles.bio}>{other.bio}</Text> : null}
 
-        {isGroup && admin ? (
-          renaming ? (
-            <Card style={{ gap: space.md }}>
+          <View style={styles.actions}>
+            {isGroup ? (
+              admin ? <QuickAction icon="plus" label="Add" onPress={() => router.push({ pathname: '/new-group', params: { add: conv.id } })} /> : null
+            ) : (
+              <QuickAction icon="user" label="Profile" onPress={() => other && router.push(`/user/${other.username}`)} />
+            )}
+            <QuickAction icon="search" label="Search" onPress={search} />
+            <QuickAction icon={conv.myMuted ? 'bellOff' : 'bell'} label={conv.myMuted ? 'Unmute' : 'Mute'} onPress={() => void setMuted(!conv.myMuted)} />
+          </View>
+        </Animated.View>
+
+        {renaming ? (
+          <Section>
+            <View style={{ padding: space.md, gap: space.md }}>
               <Field label="Group name" value={title} onChangeText={setTitle} maxLength={60} />
               <ErrorText>{error}</ErrorText>
               <Button title="Save" onPress={() => void rename()} />
-            </Card>
-          ) : (
-            <Card style={styles.menu}>
-              <Row icon="edit" label="Rename group" onPress={() => setRenaming(true)} />
-              <Row icon="plus" label="Add people" onPress={() => router.push({ pathname: '/new-group', params: { add: conv.id } })} />
-            </Card>
-          )
+            </View>
+          </Section>
         ) : null}
 
+        {/* Shared photos */}
+        <Section>
+          <View style={styles.sectionHead}>
+            <Text style={styles.sectionTitle}>Photos</Text>
+            <Text style={styles.count}>{photos.length}</Text>
+          </View>
+          {photos.length ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photos}>
+              {photos.slice(0, 20).map((p) => (
+                <View key={p.id} style={styles.thumb}>
+                  <EncryptedImage media={{ ...p.media, width: 1, height: 1 }} maxWidth={96} onPress={(uri) => router.push({ pathname: '/photo', params: { uri } })} />
+                </View>
+              ))}
+            </ScrollView>
+          ) : (
+            <Text style={styles.emptyLine}>Photos you share here will show up here.</Text>
+          )}
+        </Section>
+
+        {/* Settings */}
+        <Section>
+          <Row
+            icon={conv.myMuted ? 'bellOff' : 'bell'}
+            title="Notifications"
+            subtitle={conv.myMuted ? 'Muted' : 'On'}
+            right={
+              <Switch
+                value={!conv.myMuted}
+                onValueChange={(on) => void setMuted(!on)}
+                trackColor={{ true: colors.rose, false: colors.surfaceMuted }}
+                thumbColor={colors.surface}
+                ios_backgroundColor={colors.surfaceMuted}
+                // react-native-web colours the active thumb separately (teal by default).
+                {...({ activeThumbColor: colors.surface } as object)}
+                accessibilityLabel="Notifications"
+              />
+            }
+          />
+          <Row
+            icon="lock"
+            title="Encryption"
+            subtitle={isGroup ? 'Messages are end-to-end encrypted. Only members can read them.' : 'Messages are end-to-end encrypted. Tap to verify.'}
+            onPress={!isGroup && other ? () => router.push(`/verify/${conv.id}`) : undefined}
+          />
+        </Section>
+
+        {/* People */}
         {isGroup ? (
-          <Card style={{ paddingHorizontal: 0, paddingVertical: space.sm }}>
-            <Text style={[styles.section, { paddingHorizontal: space.lg }]}>{conv.members.length} people</Text>
-            {conv.members.map((m) => (
-              <UserRow
+          <Section>
+            <View style={styles.sectionHead}>
+              <Text style={styles.sectionTitle}>{conv.members.length} members</Text>
+            </View>
+            {admin ? <Row icon="plus" accent title="Add people" onPress={() => router.push({ pathname: '/new-group', params: { add: conv.id } })} /> : null}
+            {[...conv.members].sort((a, b) => (a.id === myId ? -1 : b.id === myId ? 1 : 0)).map((m) => (
+              <MemberRow
                 key={m.id}
-                user={m}
-                subtitle={`@${m.username}${m.role === 'admin' ? ' · Admin' : ''}${m.status === 'pending' ? ' · Invited' : ''}`}
-                onPress={m.id === me.id ? undefined : () => router.push(`/user/${m.username}`)}
-                right={admin && m.id !== me.id ? (
-                  <Pressable accessibilityRole="button" accessibilityLabel={`Remove ${m.displayName}`} onPress={() => void removeMember(m.id, m.displayName)} hitSlop={8}>
-                    <Text style={styles.remove}>Remove</Text>
-                  </Pressable>
-                ) : null}
+                name={m.id === myId ? 'You' : m.displayName}
+                avatarName={m.displayName}
+                seed={m.username}
+                subtitle={`@${m.username}${m.status === 'pending' ? ' · Invited' : ''}`}
+                badge={m.role === 'admin' ? 'Admin' : undefined}
+                onPress={m.id === myId ? undefined : () => router.push(`/user/${m.username}`)}
+                onRemove={admin && m.id !== myId ? () => void removeMember(m.id, m.displayName) : undefined}
               />
             ))}
-          </Card>
-        ) : null}
-
-        {safety ? (
-          <Card style={{ gap: space.sm }}>
-            <View style={styles.lockRow}>
-              <Icon name="lock" size={18} color={colors.rose} />
-              <Text style={styles.section}>Encryption</Text>
+          </Section>
+        ) : other ? (
+          <Section>
+            <View style={styles.sectionHead}>
+              <Text style={styles.sectionTitle}>{groupsInCommon.length ? `${groupsInCommon.length} ${groupsInCommon.length === 1 ? 'group' : 'groups'} in common` : 'No groups in common'}</Text>
             </View>
-            <Text style={styles.small}>
-              Compare this number with {other?.displayName}'s phone, in person. If they match, nobody — including our server — can read your chat.
-            </Text>
-            <Text style={styles.safety} selectable accessibilityLabel={`Safety number ${safety}`}>{safety}</Text>
-          </Card>
+            <Row icon="users" accent title={`Create group with ${other.displayName}`} onPress={() => router.push({ pathname: '/new-group', params: { with: other.username } })} />
+            <Row icon="userPlus" accent title="Add to groups" subtitle="Add them to groups you manage." onPress={() => router.push({ pathname: '/add-to-group', params: { userId: other.id, name: other.displayName } })} />
+            {groupsInCommon.map((g) => (
+              <MemberRow
+                key={g.id}
+                group
+                name={g.title ?? 'Group'}
+                seed={g.id}
+                subtitle={g.members.map((m) => (m.id === myId ? 'You' : m.displayName)).join(', ')}
+                onPress={() => router.push(`/chat/${g.id}`)}
+              />
+            ))}
+          </Section>
         ) : null}
 
-        <Card style={styles.menu}>
-          {!isGroup ? <Row icon="block" label={`Block ${other?.displayName ?? ''}`} onPress={() => void block()} danger /> : null}
-          <Row icon="flag" label={isGroup ? 'Report group' : `Report ${other?.displayName ?? ''}`} danger
-            onPress={() => setReport({ conversationId: conv.id, userId: isGroup ? undefined : other?.id, label: isGroup ? 'this group' : `@${other?.username}` })} />
-          <Row icon="trash" label={isGroup ? 'Leave group' : 'Delete chat'} onPress={() => void leave()} danger />
-        </Card>
+        {/* Destructive */}
+        <Section>
+          <Row icon="eraser" danger title="Clear chat" onPress={() => void clearChat()} />
+          {isGroup ? (
+            <Row icon="logout" danger title="Leave group" onPress={() => void leave()} />
+          ) : (
+            <>
+              <Row icon="block" danger title={`Block ${other?.displayName ?? ''}`} onPress={() => void block()} />
+              <Row icon="trash" danger title="Delete chat" onPress={() => void leave()} />
+            </>
+          )}
+          <Row
+            icon="flag"
+            danger
+            title={isGroup ? 'Report group' : `Report ${other?.displayName ?? ''}`}
+            onPress={() => setReport({ conversationId: conv.id, userId: isGroup ? undefined : other?.id, label: isGroup ? 'this group' : `@${other?.username}` })}
+          />
+        </Section>
       </ScrollView>
       <ReportSheet target={report} onClose={() => setReport(null)} />
     </Screen>
   );
 }
 
-function Row({ icon, label, onPress, danger }: { icon: IconName; label: string; onPress: () => void; danger?: boolean }) {
-  const color = danger ? colors.danger : colors.ink;
+function Header({ onBack, onEdit }: { onBack: () => void; onEdit?: () => void }) {
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.row, pressed && { opacity: 0.6 }]}>
-      <Icon name={icon} color={color} size={22} />
-      <Text style={[styles.rowText, { color }]}>{label}</Text>
+    <View style={styles.header}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={onBack} hitSlop={12} style={styles.headerButton}>
+        <Icon name="back" color={colors.ink} />
+      </Pressable>
+      <View style={{ flex: 1 }} />
+      {onEdit ? (
+        <Pressable accessibilityRole="button" accessibilityLabel="Rename group" onPress={onEdit} hitSlop={12} style={styles.headerButton}>
+          <Icon name="edit" color={colors.ink} />
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+function QuickAction({ icon, label, onPress }: { icon: IconName; label: string; onPress: () => void }) {
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({ pressed }) => [styles.action, pressed && { transform: [{ scale: 0.96 }] }]}>
+      <Icon name={icon} color={colors.rose} size={22} />
+      <Text style={styles.actionLabel}>{label}</Text>
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { padding: space.lg, gap: space.lg },
-  hero: { alignItems: 'center', gap: space.xs },
-  name: { fontFamily: fonts.heavy, fontSize: 24, color: colors.ink, marginTop: space.sm, textAlign: 'center' },
-  link: { fontFamily: fonts.bold, fontSize: 15, color: colors.rose },
-  menu: { paddingVertical: space.sm, paddingHorizontal: space.md },
-  row: { flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 52 },
-  rowText: { flex: 1, fontFamily: fonts.bold, fontSize: 16 },
-  section: { fontFamily: fonts.bold, fontSize: 16, color: colors.ink },
-  remove: { fontFamily: fonts.bold, fontSize: 14, color: colors.danger },
-  lockRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  small: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 20, color: colors.inkMuted },
-  safety: { fontFamily: fonts.bold, fontSize: 19, letterSpacing: 2, lineHeight: 30, color: colors.ink, textAlign: 'center', paddingVertical: space.sm, fontVariant: ['tabular-nums'] },
-});
+function Section({ children }: { children: ReactNode }) {
+  return <View style={styles.section}>{children}</View>;
+}
 
+function Row({ icon, title, subtitle, onPress, right, danger, accent }: {
+  icon: IconName;
+  title: string;
+  subtitle?: string;
+  onPress?: () => void;
+  right?: ReactNode;
+  danger?: boolean;
+  accent?: boolean;
+}) {
+  const color = danger ? colors.danger : colors.ink;
+  return (
+    <View style={styles.rowWrap}>
+      <Pressable
+        accessibilityRole={onPress ? 'button' : undefined}
+        accessibilityLabel={subtitle ? `${title}. ${subtitle}` : title}
+        onPress={onPress}
+        disabled={!onPress}
+        style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surfaceMuted }]}
+      >
+        {accent ? (
+          <View style={styles.accentIcon}><Icon name={icon} color={colors.onRose} size={20} /></View>
+        ) : (
+          <View style={styles.rowIcon}><Icon name={icon} color={danger ? colors.danger : colors.inkMuted} size={22} /></View>
+        )}
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.rowTitle, { color }]}>{title}</Text>
+          {subtitle ? <Text style={styles.rowSub}>{subtitle}</Text> : null}
+        </View>
+      </Pressable>
+      {right ? <View style={styles.rowRight}>{right}</View> : null}
+    </View>
+  );
+}
+
+function MemberRow({ name, avatarName, seed, subtitle, badge, onPress, onRemove, group }: {
+  name: string;
+  avatarName?: string;
+  seed: string;
+  subtitle: string;
+  badge?: string;
+  onPress?: () => void;
+  onRemove?: () => void;
+  group?: boolean;
+}) {
+  return (
+    <View style={styles.rowWrap}>
+      <Pressable
+        accessibilityRole={onPress ? 'button' : undefined}
+        accessibilityLabel={name}
+        onPress={onPress}
+        disabled={!onPress}
+        style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surfaceMuted }]}
+      >
+        {group ? <GroupAvatar size={44} /> : <Avatar name={avatarName ?? name} seed={seed} size={44} />}
+        <View style={{ flex: 1 }}>
+          <Text style={styles.rowTitle} numberOfLines={1}>{name}</Text>
+          <Text style={styles.rowSub} numberOfLines={1}>{subtitle}</Text>
+        </View>
+        {badge ? <Text style={styles.badge}>{badge}</Text> : null}
+      </Pressable>
+      {onRemove ? (
+        <Pressable accessibilityRole="button" accessibilityLabel={`Remove ${name}`} onPress={onRemove} hitSlop={8} style={styles.rowRight}>
+          <Text style={styles.remove}>Remove</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.sm, paddingVertical: space.xs },
+  headerButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  container: { paddingHorizontal: space.md, paddingBottom: space.xxl, gap: space.md },
+  hero: { alignItems: 'center', paddingBottom: space.sm },
+  name: { fontFamily: fonts.heavy, fontSize: 28, color: colors.ink, marginTop: space.md, textAlign: 'center', letterSpacing: -0.3 },
+  sub: { fontFamily: fonts.medium, fontSize: 15, color: colors.inkMuted, marginTop: 2 },
+  bio: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 21, color: colors.ink, textAlign: 'center', marginTop: space.sm, paddingHorizontal: space.lg },
+  actions: { flexDirection: 'row', gap: space.sm, marginTop: space.lg, alignSelf: 'stretch', justifyContent: 'center' },
+  action: {
+    flex: 1, maxWidth: 110, alignItems: 'center', gap: 6, paddingVertical: 12, borderRadius: radius.md,
+    backgroundColor: colors.surface, ...shadow, shadowOpacity: 0.05,
+  },
+  actionLabel: { fontFamily: fonts.bold, fontSize: 13, color: colors.ink },
+  section: { backgroundColor: colors.surface, borderRadius: radius.lg, paddingVertical: space.xs, overflow: 'hidden', ...shadow, shadowOpacity: 0.04 },
+  sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: space.md, paddingTop: space.sm, paddingBottom: space.xs },
+  sectionTitle: { fontFamily: fonts.bold, fontSize: 14, color: colors.inkMuted },
+  count: { fontFamily: fonts.bold, fontSize: 14, color: colors.inkMuted },
+  photos: { gap: space.sm, paddingHorizontal: space.md, paddingVertical: space.sm },
+  thumb: { width: 96, height: 96, borderRadius: radius.sm, overflow: 'hidden' },
+  emptyLine: { fontFamily: fonts.regular, fontSize: 14, color: colors.inkMuted, paddingHorizontal: space.md, paddingBottom: space.md },
+  rowWrap: { flexDirection: 'row', alignItems: 'center' },
+  row: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.md, paddingVertical: 12, minHeight: 56 },
+  rowIcon: { width: 44, alignItems: 'center' },
+  accentIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.rose, alignItems: 'center', justifyContent: 'center' },
+  rowTitle: { fontFamily: fonts.bold, fontSize: 16, color: colors.ink },
+  rowSub: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 19, color: colors.inkMuted, marginTop: 1 },
+  rowRight: { paddingRight: space.md, paddingLeft: space.sm },
+  badge: { fontFamily: fonts.bold, fontSize: 12, color: colors.rose, backgroundColor: colors.roseTint, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill, overflow: 'hidden' },
+  remove: { fontFamily: fonts.bold, fontSize: 14, color: colors.danger },
+});

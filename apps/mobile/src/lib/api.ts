@@ -77,6 +77,7 @@ export interface ConversationView {
   lastMessageAt: string | null;
   myStatus: 'accepted' | 'pending';
   myRole: 'admin' | 'member';
+  myMuted: boolean;
   members: MemberView[];
   lastMessage: MessageRow | null;
   unreadCount: number;

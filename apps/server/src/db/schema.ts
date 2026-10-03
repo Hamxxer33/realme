@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 
 // Messages are stored only as ciphertext plus one wrapped key per member
 // (see @realme/crypto). Timeline posts are public by design and stored as-is.
@@ -44,6 +44,9 @@ export const members = pgTable('conversation_members', {
   status: text('status', { enum: ['accepted', 'pending'] }).notNull(),
   joinedAt: ts('joined_at').notNull().defaultNow(),
   lastReadAt: ts('last_read_at'),
+  // Per-member settings: no push notifications, and "clear chat" hides history before this moment.
+  muted: boolean('muted').notNull().default(false),
+  clearedAt: ts('cleared_at'),
 }, (t) => [
   primaryKey({ columns: [t.conversationId, t.userId] }),
   index('members_user_idx').on(t.userId),

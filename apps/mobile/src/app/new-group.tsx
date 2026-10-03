@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BackHeader } from '../components/BackHeader';
 import { Icon } from '../components/Icon';
@@ -13,7 +13,7 @@ import { colors, fonts, radius, space } from '../theme';
 
 /** Create a group, or (with ?add=<conversationId>) add people to an existing one. */
 export default function NewGroup() {
-  const { add } = useLocalSearchParams<{ add?: string }>();
+  const { add, with: withUsername } = useLocalSearchParams<{ add?: string; with?: string }>();
   const existing = useConversation(add);
   const [title, setTitle] = useState('');
   const [query, setQuery] = useState('');
@@ -22,6 +22,13 @@ export default function NewGroup() {
   const [busy, setBusy] = useState(false);
   const { results } = useUserSearch(query);
   const alreadyIn = new Set(existing?.members.map((m) => m.id) ?? []);
+
+  // "Create group with …" from chat info: start with that person picked.
+  useEffect(() => {
+    if (!withUsername) return;
+    api<{ user: PublicUser }>('GET', `/users/${withUsername}`)
+      .then(({ user }) => setPicked((list) => (list.some((p) => p.id === user.id) ? list : [user, ...list])), () => {});
+  }, [withUsername]);
 
   const toggle = (u: PublicUser) =>
     setPicked((list) => (list.some((p) => p.id === u.id) ? list.filter((p) => p.id !== u.id) : [...list, u]));

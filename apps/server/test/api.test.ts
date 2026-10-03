@@ -348,6 +348,42 @@ describe('reading and history', () => {
   });
 });
 
+describe('per-chat settings', () => {
+  it('muting stops push notifications for that chat only', async () => {
+    const [ana, ben] = [await ctx.signup('ana'), await ctx.signup('ben')];
+    await ctx.call('PUT', '/me/push-token', { as: ben, body: { token: 'ExponentPushToken[ben]' } });
+    const conv = await ctx.direct(ana, ben);
+    await ctx.call('POST', `/conversations/${conv}/accept`, { as: ben });
+    const res = await ctx.call('PATCH', `/conversations/${conv}/me`, { as: ben, body: { muted: true } });
+    expect(res.body.conversation.myMuted).toBe(true);
+    await ctx.send(ana, conv, { kind: 'text', text: 'shh' });
+    await new Promise((r) => setTimeout(r, 10));
+    expect(ctx.pushes).toEqual([]);
+    await ctx.call('PATCH', `/conversations/${conv}/me`, { as: ben, body: { muted: false } });
+    await ctx.send(ana, conv, { kind: 'text', text: 'hello again' });
+    await new Promise((r) => setTimeout(r, 10));
+    expect(ctx.pushes).toHaveLength(1);
+  });
+
+  it('clearing a chat hides its history for me only; new messages still arrive', async () => {
+    const [ana, ben] = [await ctx.signup('ana'), await ctx.signup('ben')];
+    const conv = await ctx.direct(ana, ben);
+    await ctx.send(ana, conv, { kind: 'text', text: 'old 1' });
+    await ctx.send(ben, conv, { kind: 'text', text: 'old 2' });
+    const cleared = (await ctx.call('POST', `/conversations/${conv}/clear`, { as: ben })).body.conversation;
+    expect(cleared.lastMessage).toBeNull();
+    expect(cleared.unreadCount).toBe(0);
+    expect((await ctx.call('GET', `/conversations/${conv}/messages`, { as: ben })).body.messages).toEqual([]);
+    expect((await ctx.call('GET', `/conversations/${conv}/messages`, { as: ana })).body.messages).toHaveLength(2);
+
+    await new Promise((r) => setTimeout(r, 5));
+    await ctx.send(ana, conv, { kind: 'text', text: 'new' });
+    const after = (await ctx.call('GET', `/conversations/${conv}/messages`, { as: ben })).body.messages;
+    expect(after.map((m: any) => ctx.open(ben, ana, m))).toEqual([{ kind: 'text', text: 'new' }]);
+    expect((await ctx.call('GET', '/conversations', { as: ben })).body.conversations[0].unreadCount).toBe(1);
+  });
+});
+
 describe('blocking and reporting', () => {
   it('blocking stops chats, search, profiles, group adds and posts — both ways', async () => {
     const [ana, ben, cat] = [await ctx.signup('ana'), await ctx.signup('ben'), await ctx.signup('cat')];

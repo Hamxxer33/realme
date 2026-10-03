@@ -1,6 +1,6 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { Avatar, GroupAvatar } from '../../components/Avatar';
 import { Bubble } from '../../components/Bubble';
@@ -8,12 +8,13 @@ import { Composer } from '../../components/Composer';
 import { Icon } from '../../components/Icon';
 import { Button, Screen } from '../../components/ui';
 import { api, type ConversationView } from '../../lib/api';
+import { onChatEvent } from '../../lib/chatEvents';
 import { confirm, notify } from '../../lib/confirm';
 import { forget, refreshConversation, upsert, useConversation } from '../../lib/conversations';
 import { conversationTitle, otherMembers } from '../../lib/format';
 import { useSession } from '../../lib/session';
 import { useChat, type ChatItem } from '../../lib/useChat';
-import { colors, fonts, radius, shadow, space } from '../../theme';
+import { noWebOutline, colors, fonts, radius, shadow, space } from '../../theme';
 
 const REACTIONS = ['❤️', '🥰', '😂', '😮', '😢', '🔥'];
 
@@ -43,7 +44,13 @@ function Chat({ conv }: { conv: ConversationView }) {
   const chat = useChat(conv);
   const { width } = useWindowDimensions();
   const [reactingTo, setReactingTo] = useState<ChatItem | null>(null);
+  const [query, setQuery] = useState<string | null>(null); // null = not searching
   const others = otherMembers(conv, myId);
+
+  // "Search" on the info screen opens search here.
+  useEffect(() => onChatEvent((e) => {
+    if (e.type === 'search' && e.conversationId === conv.id) setQuery('');
+  }), [conv.id]);
   const title = conversationTitle(conv, myId);
   const pending = conv.myStatus === 'pending';
   const isGroup = conv.kind === 'group';
@@ -63,6 +70,11 @@ function Chat({ conv }: { conv: ConversationView }) {
   const lastMine = messages.find((m) => m.senderId === myId && m.status === 'sent' && m.body?.kind !== 'nudge');
   const readers = others.filter((m) => m.status === 'accepted');
   const readByAll = lastMine && readers.length > 0 && readers.every((m) => m.lastReadAt && m.lastReadAt >= lastMine.createdAt);
+
+  const needle = query?.trim().toLowerCase() ?? '';
+  const shown = needle
+    ? messages.filter((m) => m.body?.kind === 'text' && m.body.text.toLowerCase().includes(needle))
+    : messages;
 
   const typingNames = chat.typingUserIds.map((uid) => conv.members.find((m) => m.id === uid)?.displayName).filter(Boolean);
   const subtitle = typingNames.length
@@ -94,7 +106,29 @@ function Chat({ conv }: { conv: ConversationView }) {
 
   return (
     <Screen>
-      <TopBar
+      {query !== null ? (
+        <View style={styles.searchBar}>
+          <View style={styles.searchBox}>
+            <Icon name="search" color={colors.inkMuted} size={20} />
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Search this chat"
+              placeholderTextColor={colors.inkMuted}
+              autoFocus
+              style={styles.searchInput}
+              accessibilityLabel="Search this chat"
+            />
+          </View>
+          <Pressable accessibilityRole="button" accessibilityLabel="Close search" onPress={() => setQuery(null)} hitSlop={8}>
+            <Text style={styles.searchCancel}>Cancel</Text>
+          </Pressable>
+        </View>
+      ) : null}
+      {query !== null && needle ? (
+        <Text style={styles.searchCount}>{shown.length ? `${shown.length} ${shown.length === 1 ? 'match' : 'matches'}` : 'No matches in loaded messages'}</Text>
+      ) : null}
+      {query === null ? <TopBar
         title={title}
         subtitle={subtitle}
         avatar={isGroup
@@ -102,14 +136,14 @@ function Chat({ conv }: { conv: ConversationView }) {
           : <Avatar name={title} seed={others[0]?.username ?? conv.id} size={40} />}
         onBack={() => router.back()}
         onInfo={() => router.push(`/chat-info/${conv.id}`)}
-      />
+      /> : null}
 
       <FlatList
         inverted
-        data={messages}
+        data={shown}
         keyExtractor={(m) => m.clientId}
         renderItem={({ item, index }) => {
-          const older = messages[index + 1];
+          const older = shown[index + 1];
           const showName = isGroup && item.senderId !== myId && older?.senderId !== item.senderId;
           return (
             <Bubble
@@ -139,7 +173,7 @@ function Chat({ conv }: { conv: ConversationView }) {
         keyboardDismissMode="interactive"
       />
 
-      {pending ? (
+      {query !== null ? null : pending ? (
         <View style={styles.request}>
           <Text style={styles.requestTitle}>
             {isGroup ? `You were added to ${title}` : `${title} wants to message you`}
@@ -230,6 +264,11 @@ const styles = StyleSheet.create({
   requestRow: { flexDirection: 'row', justifyContent: 'center', gap: space.xl },
   requestAlt: { paddingVertical: 10, paddingHorizontal: space.md },
   requestAltText: { fontFamily: fonts.bold, fontSize: 15, color: colors.rose },
+  searchBar: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.md, paddingVertical: space.sm },
+  searchBox: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: space.sm, height: 44, paddingHorizontal: space.md, borderRadius: radius.pill, backgroundColor: colors.surface, ...shadow, shadowOpacity: 0.05 },
+  searchInput: { ...noWebOutline, flex: 1, height: '100%', fontFamily: fonts.regular, fontSize: 16, color: colors.ink },
+  searchCancel: { fontFamily: fonts.bold, fontSize: 15, color: colors.rose },
+  searchCount: { fontFamily: fonts.medium, fontSize: 13, color: colors.inkMuted, paddingHorizontal: space.lg, paddingBottom: space.xs },
   scrim: { flex: 1, backgroundColor: 'rgba(46,30,36,0.25)', alignItems: 'center', justifyContent: 'center' },
   reactionPicker: { flexDirection: 'row', gap: space.xs, backgroundColor: colors.surface, borderRadius: radius.pill, padding: space.sm, ...shadow },
   reactionOption: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },

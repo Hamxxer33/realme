@@ -51,6 +51,8 @@ function Routes() {
         <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
         <Stack.Screen name="chat/[id]" />
         <Stack.Screen name="chat-info/[id]" />
+        <Stack.Screen name="verify/[id]" />
+        <Stack.Screen name="add-to-group" options={{ presentation: 'modal' }} />
         <Stack.Screen name="new-chat" options={{ presentation: 'modal' }} />
         <Stack.Screen name="new-group" options={{ presentation: 'modal' }} />
         <Stack.Screen name="requests" />

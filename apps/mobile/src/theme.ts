@@ -45,3 +45,6 @@ export const motion = {
   durationFast: 180,
   durationBase: 280,
 } as const;
+
+/** Spread into TextInput styles: hides the browser focus ring in the web preview. */
+export const noWebOutline = { outlineStyle: 'none' } as object;

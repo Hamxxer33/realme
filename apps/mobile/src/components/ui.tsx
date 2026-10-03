@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, fonts, motion, radius, shadow, space } from '../theme';
+import { noWebOutline, colors, fonts, motion, radius, shadow, space } from '../theme';
 
 export function Screen({ children, style, edges = ['top', 'bottom'] }: {
   children: ReactNode;
@@ -137,7 +137,7 @@ const styles = StyleSheet.create({
   buttonGhost: { backgroundColor: 'transparent' },
   buttonText: { fontFamily: fonts.bold, fontSize: 16 },
   label: { fontFamily: fonts.medium, fontSize: 14, color: colors.inkMuted, marginLeft: 4 },
-  input: {
+  input: { ...noWebOutline,
     minHeight: 54,
     borderRadius: radius.md,
     borderWidth: 1,

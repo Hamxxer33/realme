@@ -2,6 +2,7 @@ import type { MessageBody } from '@realme/crypto';
 import * as Crypto from 'expo-crypto';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError, api, type ConversationView, type MessageRow } from './api';
+import { onChatEvent } from './chatEvents';
 import { markReadLocally, refreshConversation } from './conversations';
 import { uploadEncrypted } from './media';
 import { realtime } from './realtime';
@@ -128,6 +129,14 @@ export function useChat(conversation: ConversationView) {
       }
     });
   }, [conversationId, merge, loadLatest]);
+
+  // "Clear chat" from the info screen: drop everything we've loaded.
+  useEffect(() => onChatEvent((e) => {
+    if (e.type !== 'cleared' || e.conversationId !== conversationId) return;
+    setRows(new Map());
+    setPending(new Map());
+    setHasMore(false);
+  }), [conversationId]);
 
   // Expire typing indicators.
   useEffect(() => {

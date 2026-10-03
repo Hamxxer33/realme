@@ -10,7 +10,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, useAnimatedStyle, useSharedValue, withSequence, withSpring } from 'react-native-reanimated';
-import { colors, fonts, motion, radius, shadow, space } from '../theme';
+import { noWebOutline, colors, fonts, motion, radius, shadow, space } from '../theme';
 import { Icon } from './Icon';
 import { PressScale } from './ui';
 
@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
     ...shadow,
     shadowOpacity: 0.06,
   },
-  input: {
+  input: { ...noWebOutline,
     flex: 1,
     maxHeight: 140,
     paddingTop: 13,

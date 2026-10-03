@@ -12,7 +12,7 @@ import { confirm, notify } from '../../lib/confirm';
 import { ago } from '../../lib/format';
 import { postMenu } from '../../lib/postActions';
 import { useSession } from '../../lib/session';
-import { colors, fonts, radius, shadow, space } from '../../theme';
+import { noWebOutline, colors, fonts, radius, shadow, space } from '../../theme';
 
 export default function PostScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -144,6 +144,6 @@ const styles = StyleSheet.create({
   commentText: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 21, color: colors.ink, marginTop: 2 },
   composer: { flexDirection: 'row', alignItems: 'flex-end', gap: space.sm, padding: space.md, backgroundColor: colors.bg },
   inputShell: { flex: 1, minHeight: 48, borderRadius: radius.lg, backgroundColor: colors.surface, paddingHorizontal: space.md, ...shadow, shadowOpacity: 0.06 },
-  input: { maxHeight: 120, paddingVertical: 13, fontFamily: fonts.regular, fontSize: 16, color: colors.ink },
+  input: { ...noWebOutline, maxHeight: 120, paddingVertical: 13, fontFamily: fonts.regular, fontSize: 16, color: colors.ink },
   send: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.rose, alignItems: 'center', justifyContent: 'center' },
 });

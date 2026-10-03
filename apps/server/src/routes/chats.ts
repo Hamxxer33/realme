@@ -39,17 +39,19 @@ export function registerChats(app: App, ctx: Ctx) {
       .where(inArray(members.conversationId, conversationIds))
       .orderBy(asc(members.joinedAt));
     const last = await rows<Record<string, unknown> & { conversation_id: string }>(sql`
-      select distinct on (conversation_id) *
-      from ${messages}
-      where conversation_id in (${sql.join(conversationIds.map((id) => sql`${id}`), sql`, `)})
-      order by conversation_id, created_at desc, id desc`);
+      select distinct on (m.conversation_id) m.*
+      from ${messages} m
+      join ${members} cm on cm.conversation_id = m.conversation_id and cm.user_id = ${me.id}
+      where m.conversation_id in (${sql.join(conversationIds.map((id) => sql`${id}`), sql`, `)})
+        and m.created_at > coalesce(cm.cleared_at, '-infinity'::timestamptz)
+      order by m.conversation_id, m.created_at desc, m.id desc`);
     const unread = await rows<{ conversation_id: string; n: number }>(sql`
       select m.conversation_id, count(*)::int as n
       from ${messages} m
       join ${members} cm on cm.conversation_id = m.conversation_id and cm.user_id = ${me.id}
       where m.conversation_id in (${sql.join(conversationIds.map((id) => sql`${id}`), sql`, `)})
         and m.sender_id <> ${me.id}
-        and m.created_at > coalesce(cm.last_read_at, '-infinity'::timestamptz)
+        and m.created_at > greatest(coalesce(cm.last_read_at, '-infinity'::timestamptz), coalesce(cm.cleared_at, '-infinity'::timestamptz))
       group by m.conversation_id`);
     const lastBy = new Map(last.map((r) => [r.conversation_id, r]));
     const unreadBy = new Map(unread.map((r) => [r.conversation_id, r.n]));
@@ -65,6 +67,7 @@ export function registerChats(app: App, ctx: Ctx) {
         lastMessageAt: conv.lastMessageAt,
         myStatus: mine.status,
         myRole: mine.role,
+        myMuted: mine.muted,
         members: people.filter((p) => p.member.conversationId === conv.id).map((p) => ({
           ...publicUser(p.user),
           role: p.member.role,
@@ -189,6 +192,27 @@ export function registerChats(app: App, ctx: Ctx) {
       return c.json({ conversation: await oneView(me, conversation.id) });
     });
 
+  /** My own settings for a chat (currently: mute notifications). */
+  app.patch('/conversations/:id/me', auth, zValidator('param', z.object({ id: uuid })),
+    zValidator('json', z.object({ muted: z.boolean() })), async (c) => {
+      const me = c.var.user;
+      const { conversation } = await requireMembership(ctx, c.req.valid('param').id, me.id);
+      await db.update(members).set({ muted: c.req.valid('json').muted })
+        .where(and(eq(members.conversationId, conversation.id), eq(members.userId, me.id)));
+      return c.json({ conversation: await oneView(me, conversation.id) });
+    });
+
+  /** Clear chat: hide all current messages from my view. Others keep theirs. */
+  app.post('/conversations/:id/clear', auth, zValidator('param', z.object({ id: uuid })), async (c) => {
+    const me = c.var.user;
+    const { conversation } = await requireMembership(ctx, c.req.valid('param').id, me.id);
+    // Use the newest message's own timestamp (full precision) so nothing sent at the same instant survives.
+    await db.update(members)
+      .set({ clearedAt: sql`greatest(now(), coalesce((select max(created_at) from ${messages} where conversation_id = ${conversation.id}), now()))` })
+      .where(and(eq(members.conversationId, conversation.id), eq(members.userId, me.id)));
+    return c.json({ conversation: await oneView(me, conversation.id) });
+  });
+
   app.post('/conversations/:id/accept', auth, zValidator('param', z.object({ id: uuid })), async (c) => {
     const me = c.var.user;
     const { conversation } = await requireMembership(ctx, c.req.valid('param').id, me.id);
@@ -254,8 +278,11 @@ export function registerChats(app: App, ctx: Ctx) {
     zValidator('query', z.object({ before: uuid.optional(), limit: z.coerce.number().int().min(1).max(100).default(50) })),
     async (c) => {
       const me = c.var.user;
-      const { conversation } = await requireMembership(ctx, c.req.valid('param').id, me.id);
+      const { conversation, member } = await requireMembership(ctx, c.req.valid('param').id, me.id);
       const { before, limit } = c.req.valid('query');
+      // "Clear chat" hides everything up to that moment, for me only.
+      const sinceCleared = member.clearedAt ? sql`${messages.createdAt} > (select cleared_at from ${members}
+        where conversation_id = ${conversation.id} and user_id = ${me.id})` : undefined;
       let cursor = undefined;
       if (before) {
         const [anchor] = await db.select({ id: messages.id }).from(messages)
@@ -266,7 +293,7 @@ export function registerChats(app: App, ctx: Ctx) {
         cursor = sql`(${messages.createdAt}, ${messages.id}) < (select created_at, id from messages where id = ${anchor.id})`;
       }
       const rows = await db.select().from(messages)
-        .where(and(eq(messages.conversationId, conversation.id), cursor))
+        .where(and(eq(messages.conversationId, conversation.id), cursor, sinceCleared))
         .orderBy(desc(messages.createdAt), desc(messages.id))
         .limit(limit + 1);
       return c.json({ messages: rows.slice(0, limit).map((m) => messageFor(m, me.id)), hasMore: rows.length > limit });
@@ -281,7 +308,7 @@ export function registerChats(app: App, ctx: Ctx) {
     const me = c.var.user;
     const { conversation, member } = await requireMembership(ctx, c.req.valid('param').id, me.id);
     const body = c.req.valid('json');
-    const roster = await db.select({ userId: members.userId, status: members.status, pushToken: users.pushToken })
+    const roster = await db.select({ userId: members.userId, status: members.status, muted: members.muted, pushToken: users.pushToken })
       .from(members).innerJoin(users, eq(users.id, members.userId))
       .where(eq(members.conversationId, conversation.id));
     const others = roster.filter((m) => m.userId !== me.id);
@@ -320,7 +347,7 @@ export function registerChats(app: App, ctx: Ctx) {
     const blockers = new Set((await db.select({ id: blocks.blockerId }).from(blocks)
       .where(and(eq(blocks.blockedId, me.id), inArray(blocks.blockerId, others.map((o) => o.userId).concat(me.id))))).map((b) => b.id));
     for (const m of others) {
-      if (!m.pushToken || hub.isOnline(m.userId) || blockers.has(m.userId)) continue;
+      if (!m.pushToken || m.muted || hub.isOnline(m.userId) || blockers.has(m.userId)) continue;
       const title = conversation.kind === 'group' ? conversation.title ?? 'Group' : me.displayName;
       const text = m.status === 'pending' ? 'New message request' : conversation.kind === 'group' ? `${me.displayName} sent a message` : 'Sent you a message 💌';
       void ctx.push.send(m.pushToken, title, text);
