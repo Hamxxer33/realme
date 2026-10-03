@@ -1,5 +1,5 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { Avatar, GroupAvatar } from '../../components/Avatar';
@@ -7,11 +7,12 @@ import { Bubble } from '../../components/Bubble';
 import { Composer } from '../../components/Composer';
 import { Icon } from '../../components/Icon';
 import { Button, Screen } from '../../components/ui';
-import { api, type ConversationView } from '../../lib/api';
+import { api, type ConversationView, type GroupEvent } from '../../lib/api';
 import { onChatEvent } from '../../lib/chatEvents';
 import { confirm, notify } from '../../lib/confirm';
 import { forget, refreshConversation, upsert, useConversation } from '../../lib/conversations';
 import { conversationTitle, otherMembers } from '../../lib/format';
+import { describeEvent, useGroupEvents } from '../../lib/groupEvents';
 import { useSession } from '../../lib/session';
 import { useChat, type ChatItem } from '../../lib/useChat';
 import { noWebOutline, colors, fonts, radius, shadow, space, themed } from '../../theme';
@@ -75,6 +76,19 @@ function Chat({ conv }: { conv: ConversationView }) {
   const shown = needle
     ? messages.filter((m) => m.body?.kind === 'text' && m.body.text.toLowerCase().includes(needle))
     : messages;
+
+  // Group history lines, woven in by time — only as far back as the messages we've loaded.
+  const events = useGroupEvents(conv);
+  const rows: Row[] = useMemo(() => {
+    if (query !== null || !events.length) return shown.map((m) => ({ type: 'message', item: m }));
+    const oldest = shown[shown.length - 1]?.createdAt;
+    const visible = events.filter((e) => !chat.hasMore || !oldest || e.createdAt >= oldest);
+    return [
+      ...shown.map((m): Row => ({ type: 'message', item: m })),
+      ...visible.map((e): Row => ({ type: 'event', event: e })),
+    ].sort((a, b) => rowTime(b).localeCompare(rowTime(a)));
+  }, [shown, events, query, chat.hasMore]);
+  const lockedOut = isGroup && conv.adminsOnlyMessages && conv.myRole !== 'admin';
 
   const typingNames = chat.typingUserIds.map((uid) => conv.members.find((m) => m.id === uid)?.displayName).filter(Boolean);
   const subtitle = typingNames.length
@@ -140,10 +154,13 @@ function Chat({ conv }: { conv: ConversationView }) {
 
       <FlatList
         inverted
-        data={shown}
-        keyExtractor={(m) => m.clientId}
-        renderItem={({ item, index }) => {
-          const older = shown[index + 1];
+        data={rows}
+        keyExtractor={(r) => (r.type === 'message' ? r.item.clientId : `event:${r.event.id}`)}
+        renderItem={({ item: row, index }) => {
+          if (row.type === 'event') return <EventPill text={describeEvent(row.event, myId)} />;
+          const item = row.item;
+          const olderRow = rows[index + 1];
+          const older = olderRow?.type === 'message' ? olderRow.item : undefined;
           const showName = isGroup && item.senderId !== myId && older?.senderId !== item.senderId;
           return (
             <Bubble
@@ -185,6 +202,11 @@ function Chat({ conv }: { conv: ConversationView }) {
             <Pressable accessibilityRole="button" onPress={() => void decline()} style={styles.requestAlt}><Text style={styles.requestAltText}>Delete</Text></Pressable>
           </View>
         </View>
+      ) : lockedOut ? (
+        <View style={styles.locked}>
+          <Icon name="lock" color={colors.inkMuted} size={16} />
+          <Text style={styles.lockedText}>Only admins can send messages</Text>
+        </View>
       ) : (
         <Composer
           onSendText={chat.sendText}
@@ -216,6 +238,17 @@ function Chat({ conv }: { conv: ConversationView }) {
         </Pressable>
       </Modal>
     </Screen>
+  );
+}
+
+type Row = { type: 'message'; item: ChatItem } | { type: 'event'; event: GroupEvent };
+const rowTime = (r: Row) => (r.type === 'message' ? r.item.createdAt : r.event.createdAt);
+
+function EventPill({ text }: { text: string }) {
+  return (
+    <View style={styles.eventWrap}>
+      <Text style={styles.event}>{text}</Text>
+    </View>
   );
 }
 
@@ -269,6 +302,16 @@ const styles = themed(() => StyleSheet.create({
   searchInput: { ...noWebOutline, flex: 1, height: '100%', fontFamily: fonts.regular, fontSize: 16, color: colors.ink },
   searchCancel: { fontFamily: fonts.bold, fontSize: 15, color: colors.rose },
   searchCount: { fontFamily: fonts.medium, fontSize: 13, color: colors.inkMuted, paddingHorizontal: space.lg, paddingBottom: space.xs },
+  eventWrap: { alignItems: 'center', paddingHorizontal: space.xl, paddingVertical: space.xs },
+  event: {
+    fontFamily: fonts.medium, fontSize: 13, lineHeight: 18, color: colors.inkMuted, textAlign: 'center',
+    backgroundColor: colors.surface, paddingHorizontal: space.md, paddingVertical: 6, borderRadius: radius.md, overflow: 'hidden',
+  },
+  locked: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.sm, paddingVertical: space.md, marginHorizontal: space.md,
+    marginBottom: space.sm, borderRadius: radius.lg, backgroundColor: colors.surface,
+  },
+  lockedText: { fontFamily: fonts.medium, fontSize: 14, color: colors.inkMuted },
   scrim: { flex: 1, backgroundColor: colors.scrim, alignItems: 'center', justifyContent: 'center' },
   reactionPicker: { flexDirection: 'row', gap: space.xs, backgroundColor: colors.surface, borderRadius: radius.pill, padding: space.sm, ...shadow },
   reactionOption: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },

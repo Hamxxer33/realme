@@ -26,8 +26,10 @@ packages/crypto  End-to-end encryption shared by both (libsodium)
   receipts, reactions, photos, voice notes, retries that never double-send.
 - **Message requests** — a first message from someone you don't chat with
   lands in Requests. They can't tell you've seen it until you accept.
-- **Groups** — admins rename, add and remove people; leaving hands admin to
-  someone else; the last person out deletes the group and its media.
+- **Groups** — description, several admins, "only admins can send" and "only
+  admins can edit info" settings, searchable member list, and a history of
+  changes shown in the chat ("Ana added Ben"). Leaving hands admin to someone
+  else; the last person out deletes the group and its media.
 - **Status** — text or photo updates that disappear after 24 hours, shown to
   people you have an accepted chat with. End-to-end encrypted; you see who viewed.
 - **Timeline** — public posts with an optional photo, likes and comments.
@@ -61,7 +63,7 @@ packages/crypto  End-to-end encryption shared by both (libsodium)
 
 **Not encrypted (by design):** timeline posts, comments and post photos are
 public. The server also sees usernames, who is in which chat, group names,
-message timestamps and sizes, read receipts, typing, who viewed a status, and reports.
+group descriptions and history, message timestamps and sizes, read receipts, typing, who viewed a status, and reports.
 
 **Known limitations:**
 

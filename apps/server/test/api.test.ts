@@ -287,6 +287,56 @@ describe('group chats', () => {
     expect(ctx.deletedPrefixes).toContain(`conversations/${conv.id}/`);
   });
 
+  it('description, admin-only settings and admin roles', async () => {
+    const [ana, ben, cat] = [await ctx.signup('ana'), await ctx.signup('ben'), await ctx.signup('cat')];
+    const conv = await group(ana, [ben, cat]);
+    await ctx.call('POST', `/conversations/${conv.id}/accept`, { as: ben });
+    const patch = (as: Person, body: object) => ctx.call('PATCH', `/conversations/${conv.id}`, { as, body });
+
+    // Anyone can edit info by default; only admins change settings.
+    expect((await patch(ben, { description: 'Lisbon, May 3–7' })).body.conversation.description).toBe('Lisbon, May 3–7');
+    expect((await patch(ben, { adminsOnlyEdit: true })).status).toBe(403);
+    expect((await patch(cat, { title: 'Pending people cannot' })).status).toBe(403);
+    expect((await patch(ana, { adminsOnlyEdit: true, adminsOnlyMessages: true })).body.conversation)
+      .toMatchObject({ adminsOnlyEdit: true, adminsOnlyMessages: true, createdBy: { id: ana.id } });
+    expect((await patch(ben, { title: 'Nope' })).status).toBe(403);
+
+    // Only admins can send now.
+    expect((await ctx.send(ben, conv.id, { kind: 'text', text: 'hi' })).status).toBe(403);
+    expect((await ctx.send(ana, conv.id, { kind: 'text', text: 'flights tonight' })).status).toBe(201);
+
+    // Promote Ben: now he can send and edit. The last admin can't be dismissed.
+    const role = (as: Person, who: Person, r: string) => ctx.call('PATCH', `/conversations/${conv.id}/members/${who.id}`, { as, body: { role: r } });
+    expect((await role(ben, cat, 'admin')).status).toBe(403);
+    expect((await role(ana, ben, 'admin')).status).toBe(200);
+    expect((await ctx.send(ben, conv.id, { kind: 'text', text: 'on it' })).status).toBe(201);
+    expect((await role(ben, ana, 'member')).status).toBe(200);
+    expect((await role(ben, ben, 'member')).status).toBe(400);
+  });
+
+  it('keeps a history of group changes, visible from when you joined', async () => {
+    const [ana, ben, cat] = [await ctx.signup('ana'), await ctx.signup('ben'), await ctx.signup('cat')];
+    const conv = await group(ana, [ben], 'Trip');
+    await ctx.call('PATCH', `/conversations/${conv.id}`, { as: ana, body: { title: 'Lisbon trip' } });
+    ctx.advance(1000);
+    await ctx.call('POST', `/conversations/${conv.id}/members`, { as: ana, body: { userIds: [cat.id] } });
+    await ctx.call('PATCH', `/conversations/${conv.id}/members/${cat.id}`, { as: ana, body: { role: 'admin' } });
+    await ctx.call('DELETE', `/conversations/${conv.id}/membership`, { as: ben });
+
+    const lines = (p: Person) => ctx.call('GET', `/conversations/${conv.id}/events`, { as: p })
+      .then((r) => r.body.events.map((e: any) => [e.kind, e.actor?.displayName ?? null, e.target?.displayName ?? null, e.detail]));
+    expect(await lines(ana)).toEqual([
+      ['created', 'Ana', null, 'Trip'],
+      ['renamed', 'Ana', null, 'Lisbon trip'],
+      ['added', 'Ana', 'Cat', null],
+      ['promoted', 'Ana', 'Cat', null],
+      ['left', 'Ben', null, null],
+    ]);
+    // Cat joined later: no earlier history.
+    expect((await lines(cat))[0]).toEqual(['added', 'Ana', 'Cat', null]);
+    expect((await ctx.call('GET', `/conversations/${conv.id}/events`, { as: ben })).status).toBe(404);
+  });
+
   it('a new member cannot read messages from before they joined', async () => {
     const [ana, ben, cat] = [await ctx.signup('ana'), await ctx.signup('ben'), await ctx.signup('cat')];
     const conv = await group(ana, [ben]);

@@ -4,12 +4,13 @@ import { z } from 'zod';
 import {
   type App, type Ctx, type User, HOUR, blockedBetween, fail, memberIds, publicUser, rateLimit, requireMembership, requireUser,
 } from '../context';
-import { blocks, conversations, members, messages, users } from '../db/schema';
+import { blocks, conversationEvents, conversations, members, messages, users } from '../db/schema';
 import { MAX_CIPHERTEXT_CHARS, b64, uuid } from '../validation';
 
 export const MAX_GROUP_MEMBERS = 64;
 
 type MessageRow = typeof messages.$inferSelect;
+type EventKind = typeof conversationEvents.$inferInsert['kind'];
 
 /** A message as one member sees it: only their own copy of the key. */
 export const messageFor = (m: MessageRow, userId: string) => ({
@@ -53,6 +54,9 @@ export function registerChats(app: App, ctx: Ctx) {
         and m.sender_id <> ${me.id}
         and m.created_at > greatest(coalesce(cm.last_read_at, '-infinity'::timestamptz), coalesce(cm.cleared_at, '-infinity'::timestamptz))
       group by m.conversation_id`);
+    const creatorIds = [...new Set(convs.map((c) => c.createdBy).filter((id): id is string => !!id))];
+    const creators = new Map((creatorIds.length ? await db.select().from(users).where(inArray(users.id, creatorIds)) : [])
+      .map((u) => [u.id, { id: u.id, displayName: u.displayName, username: u.username }]));
     const lastBy = new Map(last.map((r) => [r.conversation_id, r]));
     const unreadBy = new Map(unread.map((r) => [r.conversation_id, r.n]));
 
@@ -63,6 +67,10 @@ export function registerChats(app: App, ctx: Ctx) {
         id: conv.id,
         kind: conv.kind,
         title: conv.title,
+        description: conv.description,
+        adminsOnlyMessages: conv.adminsOnlyMessages,
+        adminsOnlyEdit: conv.adminsOnlyEdit,
+        createdBy: conv.createdBy ? creators.get(conv.createdBy) ?? null : null,
         createdAt: conv.createdAt,
         lastMessageAt: conv.lastMessageAt,
         myStatus: mine.status,
@@ -96,6 +104,11 @@ export function registerChats(app: App, ctx: Ctx) {
       join ${members} b on b.conversation_id = c.id and b.user_id = ${adderId}
       where c.kind = 'direct' limit 1`);
     return row ? 'accepted' : 'pending';
+  }
+
+  /** Record a line of group history ("Ana added Ben"). */
+  async function logEvent(conversationId: string, actorId: string | null, kind: EventKind, targetId?: string | null, detail?: string) {
+    await db.insert(conversationEvents).values({ conversationId, actorId, kind, targetId: targetId ?? null, detail: detail ?? null });
   }
 
   // ---------- conversations ----------
@@ -165,6 +178,7 @@ export function registerChats(app: App, ctx: Ctx) {
         { conversationId: created!.id, userId: me.id, role: 'admin', status: 'accepted' },
         ...invitees.map((id, i) => ({ conversationId: created!.id, userId: id, status: statuses[i]! })),
       ]);
+      await tx.insert(conversationEvents).values({ conversationId: created!.id, actorId: me.id, kind: 'created', detail: title });
       return created!;
     });
     hub.send(invitees, { type: 'conversation_changed', conversationId: conv.id });
@@ -183,15 +197,100 @@ export function registerChats(app: App, ctx: Ctx) {
     return ids;
   }
 
+  /**
+   * Group info and settings. Name and description: admins, or everyone unless
+   * "only admins can edit" is on. The settings themselves: admins only.
+   */
   app.patch('/conversations/:id', auth, zValidator('param', z.object({ id: uuid })),
-    zValidator('json', z.object({ title: z.string().trim().min(1).max(60) })), async (c) => {
+    zValidator('json', z.object({
+      title: z.string().trim().min(1).max(60).optional(),
+      description: z.string().trim().max(512).optional(),
+      adminsOnlyMessages: z.boolean().optional(),
+      adminsOnlyEdit: z.boolean().optional(),
+    })), async (c) => {
       const me = c.var.user;
       const { conversation, member } = await requireMembership(ctx, c.req.valid('param').id, me.id);
-      if (conversation.kind !== 'group' || member.role !== 'admin') fail(403, 'Only group admins can do that');
-      await db.update(conversations).set({ title: c.req.valid('json').title }).where(eq(conversations.id, conversation.id));
-      hub.send(await memberIds(ctx, conversation.id), { type: 'conversation_changed', conversationId: conversation.id });
+      const patch = c.req.valid('json');
+      const admin = member.role === 'admin';
+      if (conversation.kind !== 'group') fail(400, 'Only groups have settings');
+      if (member.status !== 'accepted') fail(403, 'Accept the invite first');
+      const editsInfo = patch.title !== undefined || patch.description !== undefined;
+      const editsSettings = patch.adminsOnlyMessages !== undefined || patch.adminsOnlyEdit !== undefined;
+      if (editsSettings && !admin) fail(403, 'Only group admins can change group settings');
+      if (editsInfo && !admin && conversation.adminsOnlyEdit) fail(403, 'Only group admins can edit group info');
+
+      const changes: Partial<typeof conversations.$inferInsert> = {};
+      const events: Array<[EventKind, string]> = [];
+      if (patch.title !== undefined && patch.title !== conversation.title) {
+        changes.title = patch.title;
+        events.push(['renamed', patch.title]);
+      }
+      if (patch.description !== undefined && patch.description !== conversation.description) {
+        changes.description = patch.description;
+        events.push(['described', '']);
+      }
+      if (patch.adminsOnlyMessages !== undefined && patch.adminsOnlyMessages !== conversation.adminsOnlyMessages) {
+        changes.adminsOnlyMessages = patch.adminsOnlyMessages;
+        events.push(['settings', `messages:${patch.adminsOnlyMessages ? 'admins' : 'all'}`]);
+      }
+      if (patch.adminsOnlyEdit !== undefined && patch.adminsOnlyEdit !== conversation.adminsOnlyEdit) {
+        changes.adminsOnlyEdit = patch.adminsOnlyEdit;
+        events.push(['settings', `edit:${patch.adminsOnlyEdit ? 'admins' : 'all'}`]);
+      }
+      if (events.length) {
+        await db.update(conversations).set(changes).where(eq(conversations.id, conversation.id));
+        for (const [kind, detail] of events) await logEvent(conversation.id, me.id, kind, null, detail);
+        hub.send(await memberIds(ctx, conversation.id), { type: 'conversation_changed', conversationId: conversation.id });
+      }
       return c.json({ conversation: await oneView(me, conversation.id) });
     });
+
+  /** Make someone an admin, or dismiss them as admin. */
+  app.patch('/conversations/:id/members/:userId', auth, zValidator('param', z.object({ id: uuid, userId: uuid })),
+    zValidator('json', z.object({ role: z.enum(['admin', 'member']) })), async (c) => {
+      const me = c.var.user;
+      const { id, userId } = c.req.valid('param');
+      const { role } = c.req.valid('json');
+      const { conversation, member } = await requireMembership(ctx, id, me.id);
+      if (conversation.kind !== 'group' || member.role !== 'admin') fail(403, 'Only group admins can do that');
+      const roster = await db.select().from(members).where(eq(members.conversationId, conversation.id));
+      const target = roster.find((m) => m.userId === userId);
+      if (!target) fail(404, "They're not in this group");
+      if (target.role !== role) {
+        if (role === 'member' && roster.filter((m) => m.role === 'admin').length === 1) fail(400, 'A group needs at least one admin');
+        await db.update(members).set({ role })
+          .where(and(eq(members.conversationId, conversation.id), eq(members.userId, userId)));
+        await logEvent(conversation.id, me.id, role === 'admin' ? 'promoted' : 'demoted', userId);
+        hub.send(roster.map((m) => m.userId), { type: 'conversation_changed', conversationId: conversation.id });
+      }
+      return c.json({ conversation: await oneView(me, conversation.id) });
+    });
+
+  /** Group history since I joined (or cleared the chat): who added whom, renames, settings. */
+  app.get('/conversations/:id/events', auth, zValidator('param', z.object({ id: uuid })), async (c) => {
+    const me = c.var.user;
+    const { conversation } = await requireMembership(ctx, c.req.valid('param').id, me.id);
+    const since = sql`greatest(
+      (select joined_at from ${members} where conversation_id = ${conversation.id} and user_id = ${me.id}),
+      coalesce((select cleared_at from ${members} where conversation_id = ${conversation.id} and user_id = ${me.id}), '-infinity'::timestamptz))`;
+    const events = await db.select().from(conversationEvents)
+      .where(and(eq(conversationEvents.conversationId, conversation.id),
+        sql`${conversationEvents.createdAt} >= ${since}`))
+      .orderBy(desc(conversationEvents.createdAt), desc(conversationEvents.id))
+      .limit(200);
+    const ids = [...new Set(events.flatMap((e) => [e.actorId, e.targetId]).filter((x): x is string => !!x))];
+    const names = new Map((ids.length ? await db.select().from(users).where(inArray(users.id, ids)) : []).map((u) => [u.id, u.displayName]));
+    return c.json({
+      events: events.reverse().map((e) => ({
+        id: e.id,
+        kind: e.kind,
+        actor: e.actorId ? { id: e.actorId, displayName: names.get(e.actorId) ?? 'Someone' } : null,
+        target: e.targetId ? { id: e.targetId, displayName: names.get(e.targetId) ?? 'Someone' } : null,
+        detail: e.detail,
+        createdAt: e.createdAt,
+      })),
+    });
+  });
 
   /** My own settings for a chat (currently: mute notifications). */
   app.patch('/conversations/:id/me', auth, zValidator('param', z.object({ id: uuid })),
@@ -227,13 +326,17 @@ export function registerChats(app: App, ctx: Ctx) {
   app.delete('/conversations/:id/membership', auth, zValidator('param', z.object({ id: uuid })), async (c) => {
     const me = c.var.user;
     const { conversation } = await requireMembership(ctx, c.req.valid('param').id, me.id);
-    await removeMember(conversation.id, me.id);
+    await removeMember(conversation.id, me.id, me.id);
     return c.json({ ok: true });
   });
 
-  async function removeMember(conversationId: string, userId: string) {
+  async function removeMember(conversationId: string, userId: string, actorId: string) {
+    const [conv] = await db.select({ kind: conversations.kind }).from(conversations).where(eq(conversations.id, conversationId));
     await db.delete(members).where(and(eq(members.conversationId, conversationId), eq(members.userId, userId)));
     const remaining = await db.select().from(members).where(eq(members.conversationId, conversationId)).orderBy(asc(members.joinedAt));
+    if (conv?.kind === 'group' && remaining.length) {
+      await logEvent(conversationId, actorId, actorId === userId ? 'left' : 'removed', actorId === userId ? null : userId);
+    }
     if (!remaining.length) {
       await ctx.storage.deletePrefix(`conversations/${conversationId}/`);
       await db.delete(conversations).where(eq(conversations.id, conversationId));
@@ -244,6 +347,7 @@ export function registerChats(app: App, ctx: Ctx) {
       const heir = remaining.find((m) => m.status === 'accepted') ?? remaining[0]!;
       await db.update(members).set({ role: 'admin' })
         .where(and(eq(members.conversationId, conversationId), eq(members.userId, heir.userId)));
+      if (conv?.kind === 'group') await logEvent(conversationId, null, 'promoted', heir.userId);
     }
     hub.send([userId, ...remaining.map((m) => m.userId)], { type: 'conversation_changed', conversationId });
   }
@@ -257,8 +361,9 @@ export function registerChats(app: App, ctx: Ctx) {
       const ids = [...new Set(c.req.valid('json').userIds)].filter((id) => !current.has(id));
       if (current.size + ids.length > MAX_GROUP_MEMBERS) fail(400, `Groups can have up to ${MAX_GROUP_MEMBERS} people`);
       for (const id of await addableUsers(me.id, ids)) {
-        await db.insert(members).values({ conversationId: conversation.id, userId: id, status: await initialStatus(id, me.id) })
-          .onConflictDoNothing();
+        const [added] = await db.insert(members).values({ conversationId: conversation.id, userId: id, status: await initialStatus(id, me.id) })
+          .onConflictDoNothing().returning();
+        if (added) await logEvent(conversation.id, me.id, 'added', id);
       }
       hub.send([...current, ...ids], { type: 'conversation_changed', conversationId: conversation.id });
       return c.json({ conversation: await oneView(me, conversation.id) });
@@ -269,7 +374,8 @@ export function registerChats(app: App, ctx: Ctx) {
     const { id, userId } = c.req.valid('param');
     const { conversation, member } = await requireMembership(ctx, id, me.id);
     if (conversation.kind !== 'group' || member.role !== 'admin') fail(403, 'Only group admins can remove people');
-    await removeMember(conversation.id, userId);
+    if (!(await memberIds(ctx, conversation.id)).includes(userId)) fail(404, "They're not in this group");
+    await removeMember(conversation.id, userId, me.id);
     return c.json({ ok: true });
   });
 
@@ -314,6 +420,9 @@ export function registerChats(app: App, ctx: Ctx) {
       .where(eq(members.conversationId, conversation.id));
     const others = roster.filter((m) => m.userId !== me.id);
 
+    if (conversation.kind === 'group' && conversation.adminsOnlyMessages && member.role !== 'admin') {
+      fail(403, 'Only admins can send messages to this group');
+    }
     if (conversation.kind === 'direct' && others[0] && (await blockedBetween(ctx, me.id, others[0].userId))) {
       fail(403, "You can't message this person");
     }

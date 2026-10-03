@@ -63,6 +63,9 @@ function Routes() {
         <Stack.Screen name="chat/[id]" />
         <Stack.Screen name="chat-info/[id]" />
         <Stack.Screen name="verify/[id]" />
+        <Stack.Screen name="members/[id]" />
+        <Stack.Screen name="group-settings/[id]" />
+        <Stack.Screen name="group-edit/[id]" options={{ presentation: 'modal' }} />
         <Stack.Screen name="add-to-group" options={{ presentation: 'modal' }} />
         <Stack.Screen name="new-chat" options={{ presentation: 'modal' }} />
         <Stack.Screen name="new-group" options={{ presentation: 'modal' }} />

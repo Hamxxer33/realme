@@ -31,6 +31,10 @@ export const conversations = pgTable('conversations', {
   id: uuid('id').primaryKey().defaultRandom(),
   kind: text('kind', { enum: ['direct', 'group'] }).notNull(),
   title: text('title'), // groups only
+  description: text('description').notNull().default(''),
+  // Group settings: who may send messages, and who may change the name/description.
+  adminsOnlyMessages: boolean('admins_only_messages').notNull().default(false),
+  adminsOnlyEdit: boolean('admins_only_edit').notNull().default(false),
   // For direct chats: "<smaller user id>:<larger user id>", so a pair has exactly one chat.
   directKey: text('direct_key'),
   createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
@@ -69,6 +73,23 @@ export const messages = pgTable('messages', {
   index('messages_conversation_created_idx').on(t.conversationId, t.createdAt, t.id),
   uniqueIndex('messages_sender_client_unique').on(t.senderId, t.clientId),
 ]);
+
+/**
+ * Group history shown inline in the chat ("Ana added Ben"). Plain metadata the
+ * server already knows — never message content.
+ */
+export const conversationEvents = pgTable('conversation_events', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  conversationId: uuid('conversation_id').notNull().references(() => conversations.id, { onDelete: 'cascade' }),
+  actorId: uuid('actor_id').references(() => users.id, { onDelete: 'set null' }),
+  kind: text('kind', {
+    enum: ['created', 'added', 'removed', 'left', 'renamed', 'described', 'promoted', 'demoted', 'settings'],
+  }).notNull(),
+  targetId: uuid('target_id').references(() => users.id, { onDelete: 'set null' }),
+  // renamed: the new name; settings: e.g. "messages:admins" / "edit:all".
+  detail: text('detail'),
+  createdAt: ts('created_at').notNull().defaultNow(),
+}, (t) => [index('conversation_events_idx').on(t.conversationId, t.createdAt)]);
 
 export const posts = pgTable('posts', {
   id: uuid('id').primaryKey().defaultRandom(),

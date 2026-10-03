@@ -74,6 +74,10 @@ export interface ConversationView {
   id: string;
   kind: 'direct' | 'group';
   title: string | null;
+  description: string;
+  adminsOnlyMessages: boolean;
+  adminsOnlyEdit: boolean;
+  createdBy: { id: string; displayName: string; username: string } | null;
   createdAt: string;
   lastMessageAt: string | null;
   myStatus: 'accepted' | 'pending';
@@ -82,6 +86,15 @@ export interface ConversationView {
   members: MemberView[];
   lastMessage: MessageRow | null;
   unreadCount: number;
+}
+
+export interface GroupEvent {
+  id: string;
+  kind: 'created' | 'added' | 'removed' | 'left' | 'renamed' | 'described' | 'promoted' | 'demoted' | 'settings';
+  actor: { id: string; displayName: string } | null;
+  target: { id: string; displayName: string } | null;
+  detail: string | null;
+  createdAt: string;
 }
 
 export interface PostView {

@@ -5,9 +5,10 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Avatar, GroupAvatar } from '../../components/Avatar';
 import { Icon, type IconName } from '../../components/Icon';
 import { EncryptedImage } from '../../components/Media';
+import { MemberRow as GroupMemberRow, MemberSheet, sortMembers } from '../../components/GroupMembers';
 import { ReportSheet, type ReportTarget } from '../../components/ReportSheet';
-import { Button, ErrorText, Field, Screen } from '../../components/ui';
-import { api, type ConversationView } from '../../lib/api';
+import { Screen } from '../../components/ui';
+import { api, type ConversationView, type MemberView } from '../../lib/api';
 import { emitChatEvent } from '../../lib/chatEvents';
 import { confirm, notify } from '../../lib/confirm';
 import { forget, upsert, useConversation, useConversations } from '../../lib/conversations';
@@ -30,12 +31,14 @@ function ChatInfo({ conv }: { conv: ConversationView }) {
   const { chats } = useConversations();
   const chat = useChat(conv);
   const [report, setReport] = useState<ReportTarget | null>(null);
-  const [renaming, setRenaming] = useState(false);
-  const [title, setTitle] = useState(conv.title ?? '');
-  const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<MemberView | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   const isGroup = conv.kind === 'group';
   const admin = conv.myRole === 'admin';
+  const canEdit = isGroup && conv.myStatus === 'accepted' && (admin || !conv.adminsOnlyEdit);
+  const PREVIEW = 8;
+  const sortedMembers = useMemo(() => sortMembers(conv.members, myId), [conv.members, myId]);
   const others = otherMembers(conv, myId);
   const other = others[0];
   const name = conversationTitle(conv, myId);
@@ -78,27 +81,6 @@ function ChatInfo({ conv }: { conv: ConversationView }) {
     }
   };
 
-  const rename = async () => {
-    setError(null);
-    try {
-      const { conversation } = await api<{ conversation: ConversationView }>('PATCH', `/conversations/${conv.id}`, { title });
-      upsert(conversation);
-      setRenaming(false);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong');
-    }
-  };
-
-  const removeMember = async (userId: string, displayName: string) => {
-    if (!(await confirm(`Remove ${displayName}?`, 'They will no longer get new messages in this group.', 'Remove'))) return;
-    try {
-      await api('DELETE', `/conversations/${conv.id}/members/${userId}`);
-      upsert({ ...conv, members: conv.members.filter((m) => m.id !== userId) });
-    } catch {
-      notify("Couldn't remove");
-    }
-  };
-
   const leave = async () => {
     const ok = await confirm(
       isGroup ? `Leave ${name}?` : 'Delete this chat?',
@@ -121,7 +103,7 @@ function ChatInfo({ conv }: { conv: ConversationView }) {
 
   return (
     <Screen>
-      <Header onBack={() => router.back()} onEdit={isGroup && admin ? () => setRenaming((r) => !r) : undefined} />
+      <Header onBack={() => router.back()} onEdit={canEdit ? () => router.push(`/group-edit/${conv.id}`) : undefined} />
       <ScrollView contentContainerStyle={styles.container}>
         {/* Hero */}
         <Animated.View entering={FadeInDown.springify().damping(20)} style={styles.hero}>
@@ -143,13 +125,25 @@ function ChatInfo({ conv }: { conv: ConversationView }) {
           </View>
         </Animated.View>
 
-        {renaming ? (
+        {isGroup ? (
           <Section>
-            <View style={{ padding: space.md, gap: space.md }}>
-              <Field label="Group name" value={title} onChangeText={setTitle} maxLength={60} />
-              <ErrorText>{error}</ErrorText>
-              <Button title="Save" onPress={() => void rename()} />
-            </View>
+            {conv.description ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Group description"
+                onPress={() => setExpanded((x) => !x)}
+                style={styles.description}
+              >
+                <Text style={styles.descriptionText} numberOfLines={expanded ? undefined : 3}>{conv.description}</Text>
+                {!expanded && (conv.description.length > 140 || conv.description.split('\n').length > 3)
+                  ? <Text style={styles.readMore}>Read more</Text> : null}
+              </Pressable>
+            ) : canEdit ? (
+              <Row icon="edit" title="Add group description" onPress={() => router.push({ pathname: '/group-edit/[id]', params: { id: conv.id, focus: 'description' } })} />
+            ) : null}
+            <Text style={styles.created}>
+              Created by {conv.createdBy ? (conv.createdBy.id === myId ? 'you' : conv.createdBy.displayName) : 'a former member'}, {formatDate(conv.createdAt)}
+            </Text>
           </Section>
         ) : null}
 
@@ -191,6 +185,9 @@ function ChatInfo({ conv }: { conv: ConversationView }) {
               />
             }
           />
+          {isGroup && admin ? (
+            <Row icon="settings" title="Group settings" subtitle={groupSettingsSummary(conv)} onPress={() => router.push(`/group-settings/${conv.id}`)} />
+          ) : null}
           <Row
             icon="lock"
             title="Encryption"
@@ -204,20 +201,20 @@ function ChatInfo({ conv }: { conv: ConversationView }) {
           <Section>
             <View style={styles.sectionHead}>
               <Text style={styles.sectionTitle}>{conv.members.length} members</Text>
+              <Pressable accessibilityRole="button" accessibilityLabel="Search members" onPress={() => router.push(`/members/${conv.id}`)} hitSlop={10}>
+                <Icon name="search" color={colors.inkMuted} size={20} />
+              </Pressable>
             </View>
             {admin ? <Row icon="plus" accent title="Add people" onPress={() => router.push({ pathname: '/new-group', params: { add: conv.id } })} /> : null}
-            {[...conv.members].sort((a, b) => (a.id === myId ? -1 : b.id === myId ? 1 : 0)).map((m) => (
-              <MemberRow
-                key={m.id}
-                name={m.id === myId ? 'You' : m.displayName}
-                avatarName={m.displayName}
-                seed={m.username}
-                subtitle={`@${m.username}${m.status === 'pending' ? ' · Invited' : ''}`}
-                badge={m.role === 'admin' ? 'Admin' : undefined}
-                onPress={m.id === myId ? undefined : () => router.push(`/user/${m.username}`)}
-                onRemove={admin && m.id !== myId ? () => void removeMember(m.id, m.displayName) : undefined}
-              />
+            {sortedMembers.slice(0, PREVIEW).map((m) => (
+              <GroupMemberRow key={m.id} member={m} myId={myId} onPress={m.id === myId ? undefined : () => setSelected(m)} />
             ))}
+            {conv.members.length > PREVIEW ? (
+              <Pressable accessibilityRole="button" accessibilityLabel={`See all ${conv.members.length} members`} onPress={() => router.push(`/members/${conv.id}`)} style={styles.seeAll}>
+                <Text style={styles.seeAllText}>See all</Text>
+                <Text style={styles.count}>{conv.members.length - PREVIEW} more</Text>
+              </Pressable>
+            ) : null}
           </Section>
         ) : other ? (
           <Section>
@@ -259,8 +256,18 @@ function ChatInfo({ conv }: { conv: ConversationView }) {
         </Section>
       </ScrollView>
       <ReportSheet target={report} onClose={() => setReport(null)} />
+      <MemberSheet conv={conv} member={selected} myId={myId} onClose={() => setSelected(null)} />
     </Screen>
   );
+}
+
+const formatDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
+
+function groupSettingsSummary(conv: ConversationView) {
+  if (conv.adminsOnlyMessages && conv.adminsOnlyEdit) return 'Only admins can send messages and edit info';
+  if (conv.adminsOnlyMessages) return 'Only admins can send messages';
+  if (conv.adminsOnlyEdit) return 'Only admins can edit group info';
+  return 'Everyone can send messages and edit info';
 }
 
 function Header({ onBack, onEdit }: { onBack: () => void; onEdit?: () => void }) {
@@ -271,7 +278,7 @@ function Header({ onBack, onEdit }: { onBack: () => void; onEdit?: () => void })
       </Pressable>
       <View style={{ flex: 1 }} />
       {onEdit ? (
-        <Pressable accessibilityRole="button" accessibilityLabel="Rename group" onPress={onEdit} hitSlop={12} style={styles.headerButton}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Edit group" onPress={onEdit} hitSlop={12} style={styles.headerButton}>
           <Icon name="edit" color={colors.ink} />
         </Pressable>
       ) : null}
@@ -390,5 +397,11 @@ const styles = themed(() => StyleSheet.create({
   rowSub: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 19, color: colors.inkMuted, marginTop: 1 },
   rowRight: { paddingRight: space.md, paddingLeft: space.sm },
   badge: { fontFamily: fonts.bold, fontSize: 12, color: colors.rose, backgroundColor: colors.roseTint, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill, overflow: 'hidden' },
+  description: { paddingHorizontal: space.md, paddingTop: space.sm, paddingBottom: space.xs },
+  descriptionText: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, color: colors.ink },
+  readMore: { fontFamily: fonts.bold, fontSize: 15, color: colors.rose, marginTop: 2 },
+  created: { fontFamily: fonts.regular, fontSize: 13, color: colors.inkMuted, paddingHorizontal: space.md, paddingTop: space.xs, paddingBottom: space.sm },
+  seeAll: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: space.md, minHeight: 52 },
+  seeAllText: { fontFamily: fonts.bold, fontSize: 16, color: colors.rose },
   remove: { fontFamily: fonts.bold, fontSize: 14, color: colors.danger },
 }));
