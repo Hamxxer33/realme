@@ -87,6 +87,8 @@ function Routes() {
         <Stack.Screen name="community/[id]" />
         <Stack.Screen name="community-new" options={{ presentation: 'modal' }} />
         <Stack.Screen name="community-group-new" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="call" options={{ presentation: 'fullScreenModal', animation: 'fade', gestureEnabled: false }} />
+        <Stack.Screen name="new-call" options={{ presentation: 'modal' }} />
         <Stack.Screen name="photo" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
         <Stack.Screen name="status/[authorId]" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
         <Stack.Screen name="status-compose" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />

@@ -32,6 +32,8 @@ packages/crypto  End-to-end encryption shared by both (libsodium)
   else; the last person out deletes the group and its media.
 - **Status** — text or photo updates that disappear after 24 hours, shown to
   people you have an accepted chat with. End-to-end encrypted; you see who viewed.
+- **Calls** — one-to-one voice and video calls (WebRTC) from a chat, contact
+  info or the Calls tab, with history (missed, declined, duration).
 - **Channels** — public one-way broadcasts in the Updates tab: anyone can find
   and follow a channel; the owner posts text and photos; followers react.
 - **Communities** — groups under one roof with an announcements chat only
@@ -59,6 +61,11 @@ packages/crypto  End-to-end encryption shared by both (libsodium)
   key, which travels inside the encrypted message.
 - **Status updates** are encrypted the same way, sealed for you plus each
   contact at the moment you post. Someone you chat with later won't see it.
+- **Calls** are peer-to-peer WebRTC: media is encrypted with DTLS-SRTP keys
+  the two phones agree on. The offer/answer that carries those keys' fingerprints
+  is itself sealed with both people's account keys (same scheme as messages), so
+  the server — which only relays it — can't slip its own keys in. A TURN relay
+  only ever sees encrypted media.
 - **The password never leaves the phone.** It's stretched with Argon2id into
   two secrets: one logs in (the server stores only an Argon2 hash of it), the
   other wraps a backup of the secret key — so signing in on a new phone
@@ -69,7 +76,7 @@ packages/crypto  End-to-end encryption shared by both (libsodium)
 **Not encrypted (by design):** timeline posts, comments, post photos and
 channels (posts, photos, reactions) are public. Community chats are ordinary
 encrypted groups. The server also sees usernames, who is in which chat, group names,
-group descriptions and history, message timestamps and sizes, read receipts, typing, who viewed a status, and reports.
+group descriptions and history, message timestamps and sizes, who called whom and for how long, read receipts, typing, who viewed a status, and reports.
 
 **Known limitations:**
 
@@ -113,6 +120,21 @@ The app uses native modules (libsodium, secure storage), so it needs a
 **development build** — it won't run in Expo Go. Without Xcode/Android Studio,
 use EAS: `npx eas-cli@latest build --profile development`. Push notifications
 need an EAS project id (`npx eas-cli@latest init`).
+
+**Calls** need a TURN server in production — many mobile networks block direct
+peer-to-peer connections. Run [coturn](https://github.com/coturn/coturn) with
+`use-auth-secret` and `static-auth-secret=<secret>`, then set on the server:
+
+```bash
+TURN_URLS=turn:turn.example.com:3478?transport=udp,turns:turn.example.com:5349
+TURN_SECRET=<the same secret>   # phones get short-lived per-user credentials
+# STUN_URLS defaults to Google's public STUN server
+```
+
+Calls use `react-native-webrtc`, so they also need the development build.
+Incoming calls ring while the app is open; when it's closed they arrive as a
+push notification ("📞 Incoming call") — there's no CallKit / ConnectionService
+full-screen ringing yet, and group calls aren't supported.
 
 The web target (`npx expo start --web`, with `CORS_ORIGIN` set on the server)
 works as a development preview; keys are kept in `sessionStorage` there, so

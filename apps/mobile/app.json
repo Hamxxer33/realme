@@ -11,7 +11,9 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.realme.app",
-      "config": { "usesNonExemptEncryption": false }
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.realme.app",
@@ -30,25 +32,42 @@
       "react-native-libsodium",
       [
         "expo-splash-screen",
-        { "image": "./assets/splash-icon.png", "imageWidth": 120, "backgroundColor": "#FFF8F5" }
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 120,
+          "backgroundColor": "#FFF8F5"
+        }
       ],
       [
         "expo-audio",
-        { "microphonePermission": "Allow Realme to use your microphone so you can send voice notes." }
+        {
+          "microphonePermission": "Allow Realme to use your microphone for voice notes and calls."
+        }
       ],
       [
         "expo-image-picker",
         {
           "photosPermission": "Allow Realme to access your photos so you can share them with your partner.",
-          "cameraPermission": false,
-          "microphonePermission": false
+          "cameraPermission": "Allow Realme to use your camera for photos and video calls.",
+          "microphonePermission": "Allow Realme to use your microphone for voice notes and calls."
         }
       ],
       [
         "expo-notifications",
-        { "color": "#C2385E" }
+        {
+          "color": "#C2385E"
+        }
+      ],
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "cameraPermission": "Allow Realme to use your camera for photos and video calls.",
+          "microphonePermission": "Allow Realme to use your microphone for voice notes and calls."
+        }
       ]
     ],
-    "experiments": { "typedRoutes": true }
+    "experiments": {
+      "typedRoutes": true
+    }
   }
 }

@@ -8,6 +8,7 @@ import { Composer } from '../../components/Composer';
 import { Icon } from '../../components/Icon';
 import { Button, Screen } from '../../components/ui';
 import { api, type ConversationView, type GroupEvent } from '../../lib/api';
+import { startCall } from '../../lib/calls';
 import { onChatEvent } from '../../lib/chatEvents';
 import { confirm, notify } from '../../lib/confirm';
 import { forget, refreshConversation, upsert, useConversation } from '../../lib/conversations';
@@ -149,6 +150,7 @@ function Chat({ conv }: { conv: ConversationView }) {
         avatar={<ConversationAvatar conv={conv} title={title} seed={others[0]?.username ?? conv.id} size={40} />}
         onBack={() => router.back()}
         onInfo={() => router.push(`/chat-info/${conv.id}`)}
+        onCall={!isGroup && !pending && others[0]?.status === 'accepted' ? (kind) => void startCall(conv.id, kind) : undefined}
       /> : null}
 
       <FlatList
@@ -251,12 +253,13 @@ function EventPill({ text }: { text: string }) {
   );
 }
 
-function TopBar({ title, subtitle, avatar, onBack, onInfo }: {
+function TopBar({ title, subtitle, avatar, onBack, onInfo, onCall }: {
   title: string;
   subtitle?: string;
   avatar?: React.ReactNode;
   onBack: () => void;
   onInfo?: () => void;
+  onCall?: (kind: 'audio' | 'video') => void;
 }) {
   return (
     <View style={styles.header}>
@@ -270,6 +273,16 @@ function TopBar({ title, subtitle, avatar, onBack, onInfo }: {
           {subtitle ? <Text style={styles.status} numberOfLines={1}>{subtitle}</Text> : null}
         </View>
       </Pressable>
+      {onCall ? (
+        <>
+          <Pressable accessibilityRole="button" accessibilityLabel="Video call" onPress={() => onCall('video')} hitSlop={6} style={styles.headerButton}>
+            <Icon name="video" color={colors.ink} />
+          </Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Voice call" onPress={() => onCall('audio')} hitSlop={6} style={styles.headerButton}>
+            <Icon name="phone" color={colors.ink} />
+          </Pressable>
+        </>
+      ) : null}
       {onInfo ? (
         <Pressable accessibilityRole="button" accessibilityLabel="Chat info" onPress={onInfo} hitSlop={8} style={styles.headerButton}>
           <Icon name="more" color={colors.ink} strokeWidth={3} />

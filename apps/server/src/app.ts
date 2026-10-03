@@ -9,6 +9,7 @@ import { members } from './db/schema';
 import type { Push } from './push';
 import { Hub } from './realtime';
 import { registerAccounts } from './routes/accounts';
+import { type IceConfig, registerCalls } from './routes/calls';
 import { registerChannels } from './routes/channels';
 import { registerChats } from './routes/chats';
 import { registerCommunities } from './routes/communities';
@@ -24,6 +25,8 @@ export interface Deps {
   push: Push;
   jwtSecret: string;
   now?: () => Date;
+  /** STUN/TURN servers handed to phones for calls. */
+  ice?: IceConfig;
   /** Middleware to install ahead of every route (e.g. CORS). */
   beforeRoutes?: (app: Hono<AppEnv>) => void;
 }
@@ -52,6 +55,7 @@ export function createApp(deps: Deps) {
   registerSafety(app, ctx);
   const status = registerStatus(app, ctx);
   registerMedia(app, ctx, status);
+  const callSignals = registerCalls(app, ctx, deps.ice);
 
   // The token is sent as the first frame rather than in the URL so it never lands in access logs.
   app.get('/ws', upgradeWebSocket(() => {
@@ -64,7 +68,7 @@ export function createApp(deps: Deps) {
         }, WS_AUTH_TIMEOUT_MS);
       },
       async onMessage(evt, ws: WSContext) {
-        let msg: { type?: string; token?: string; conversationId?: string };
+        let msg: { type?: string; token?: string; conversationId?: string; callId?: unknown; payload?: unknown };
         try {
           msg = JSON.parse(String(evt.data));
         } catch {
@@ -87,6 +91,8 @@ export function createApp(deps: Deps) {
           hub.send(rows.filter((r) => r.userId !== userId && r.status === 'accepted').map((r) => r.userId), {
             type: 'typing', conversationId: msg.conversationId, userId,
           });
+        } else if (msg.type === 'call_signal') {
+          await callSignals.relaySignal(userId, msg);
         } else if (msg.type === 'ping') {
           ws.send(JSON.stringify({ type: 'pong' }));
         }

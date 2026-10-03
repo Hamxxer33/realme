@@ -216,3 +216,24 @@ export const channelReactions = pgTable('channel_reactions', {
   emoji: text('emoji').notNull(),
   createdAt: ts('created_at').notNull().defaultNow(),
 }, (t) => [primaryKey({ columns: [t.postId, t.userId] })]);
+
+/**
+ * One-to-one voice/video calls: the record behind the Calls tab and the
+ * ringing state. Media flows peer-to-peer (or via TURN), encrypted with
+ * DTLS-SRTP keys that the two phones agree on through end-to-end encrypted
+ * signaling — the server never sees them.
+ */
+export const calls = pgTable('calls', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  conversationId: uuid('conversation_id').notNull().references(() => conversations.id, { onDelete: 'cascade' }),
+  callerId: uuid('caller_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  calleeId: uuid('callee_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  kind: text('kind', { enum: ['audio', 'video'] }).notNull(),
+  createdAt: ts('created_at').notNull().defaultNow(),
+  answeredAt: ts('answered_at'),
+  endedAt: ts('ended_at'),
+  endReason: text('end_reason', { enum: ['hangup', 'declined', 'cancelled', 'missed', 'failed'] }),
+}, (t) => [
+  index('calls_caller_idx').on(t.callerId, t.createdAt),
+  index('calls_callee_idx').on(t.calleeId, t.createdAt),
+]);

@@ -7,7 +7,10 @@ export type ServerEvent =
   | { type: 'conversation_changed'; conversationId: string }
   | { type: 'status_changed'; authorId: string }
   | { type: 'channel_post'; channelId: string }
-  | { type: 'community_changed'; communityId: string };
+  | { type: 'community_changed'; communityId: string }
+  | { type: 'call_ring'; callId: string }
+  | { type: 'call_update'; callId: string }
+  | { type: 'call_signal'; callId: string; from: string; payload: unknown };
 
 /** Tracks open sockets per user. Single-process; see README for scaling past one instance. */
 export class Hub {

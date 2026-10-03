@@ -17,6 +17,13 @@ const schema = z.object({
   EXPO_ACCESS_TOKEN: z.string().optional(),
   // Only needed for the web build (phones don't send CORS requests). Comma-separated origins.
   CORS_ORIGIN: z.string().optional(),
+  // Calls. STUN lets phones find each other; TURN relays media when they can't
+  // connect directly (strict NATs, many mobile networks) — needed in production.
+  STUN_URLS: z.string().default('stun:stun.l.google.com:19302'),
+  TURN_URLS: z.string().optional(), // e.g. "turn:turn.example.com:3478?transport=udp,turns:turn.example.com:5349"
+  TURN_SECRET: z.string().optional(), // coturn static-auth-secret (preferred)
+  TURN_USERNAME: z.string().optional(),
+  TURN_CREDENTIAL: z.string().optional(),
 });
 
 export type Env = z.infer<typeof schema>;

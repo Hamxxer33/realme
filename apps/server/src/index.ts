@@ -23,6 +23,13 @@ const { app, injectWebSocket } = createApp({
     ? (a) => a.use('*', cors({ origin: env.CORS_ORIGIN!.split(',').map((o) => o.trim()) }))
     : undefined,
   db,
+  ice: {
+    stunUrls: env.STUN_URLS.split(',').map((u) => u.trim()).filter(Boolean),
+    turnUrls: (env.TURN_URLS ?? '').split(',').map((u) => u.trim()).filter(Boolean),
+    turnSecret: env.TURN_SECRET,
+    turnUsername: env.TURN_USERNAME,
+    turnCredential: env.TURN_CREDENTIAL,
+  },
   jwtSecret: env.JWT_SECRET,
   push: expoPush(env.EXPO_ACCESS_TOKEN),
   storage: local?.storage ?? s3Storage({

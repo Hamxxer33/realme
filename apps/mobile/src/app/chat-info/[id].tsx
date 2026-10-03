@@ -9,6 +9,7 @@ import { MemberRow as GroupMemberRow, MemberSheet, sortMembers } from '../../com
 import { ReportSheet, type ReportTarget } from '../../components/ReportSheet';
 import { Screen } from '../../components/ui';
 import { api, type ConversationView, type MemberView } from '../../lib/api';
+import { startCall } from '../../lib/calls';
 import { emitChatEvent } from '../../lib/chatEvents';
 import { confirm, notify } from '../../lib/confirm';
 import { forget, upsert, useConversation, useConversations } from '../../lib/conversations';
@@ -129,7 +130,16 @@ function ChatInfo({ conv }: { conv: ConversationView }) {
             {isGroup ? (
               admin ? <QuickAction icon="plus" label="Add" onPress={() => router.push({ pathname: '/new-group', params: { add: conv.id } })} /> : null
             ) : (
-              <QuickAction icon="user" label="Profile" onPress={() => other && router.push(`/user/${other.username}`)} />
+              <>
+                {other?.status === 'accepted' && conv.myStatus === 'accepted' ? (
+                  <>
+                    <QuickAction icon="phone" label="Voice" onPress={() => void startCall(conv.id, 'audio')} />
+                    <QuickAction icon="video" label="Video" onPress={() => void startCall(conv.id, 'video')} />
+                  </>
+                ) : (
+                  <QuickAction icon="user" label="Profile" onPress={() => other && router.push(`/user/${other.username}`)} />
+                )}
+              </>
             )}
             <QuickAction icon="search" label="Search" onPress={search} />
             <QuickAction icon={conv.myMuted ? 'bellOff' : 'bell'} label={conv.myMuted ? 'Unmute' : 'Mute'} onPress={() => void setMuted(!conv.myMuted)} />

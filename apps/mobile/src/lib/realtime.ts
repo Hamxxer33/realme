@@ -1,4 +1,5 @@
 import { AppState } from 'react-native';
+import type { EncryptedMessage } from '@realme/crypto';
 import type { MessageRow } from './api';
 import { WS_URL } from './config';
 
@@ -10,6 +11,9 @@ export type RealtimeEvent =
   | { type: 'status_changed'; authorId: string }
   | { type: 'channel_post'; channelId: string }
   | { type: 'community_changed'; communityId: string }
+  | { type: 'call_ring'; callId: string }
+  | { type: 'call_update'; callId: string }
+  | { type: 'call_signal'; callId: string; from: string; payload: EncryptedMessage }
   | { type: 'connected' };
 
 type Listener = (event: RealtimeEvent) => void;
@@ -51,7 +55,7 @@ class Realtime {
     return () => void this.listeners.delete(fn);
   }
 
-  send(payload: { type: 'typing'; conversationId: string }) {
+  send(payload: { type: 'typing'; conversationId: string } | { type: 'call_signal'; callId: string; payload: EncryptedMessage }) {
     if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(payload));
   }
 

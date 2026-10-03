@@ -771,6 +771,87 @@ describe('realtime', () => {
     for (const s of [a, b, c]) s.ws.close();
   });
 
+  it('calls ring the other person, relay signaling only between the two, and land in history', async () => {
+    const [ana, ben, cat] = [await ctx.signup('ana'), await ctx.signup('ben'), await ctx.signup('cat')];
+    const dm = await ctx.direct(ana, ben);
+    await ctx.send(ana, dm, { kind: 'text', text: 'hi' });
+    // Not until both accepted the chat.
+    expect((await ctx.call('POST', '/calls', { as: ana, body: { conversationId: dm, kind: 'video' } })).status).toBe(403);
+    await ctx.call('POST', `/conversations/${dm}/accept`, { as: ben });
+
+    const url = await ctx.listen();
+    const [a, b, c] = [connect(url, ana.token), connect(url, ben.token), connect(url, cat.token)];
+    await Promise.all([a.ready, b.ready, c.ready]);
+
+    const call = (await ctx.call('POST', '/calls', { as: ana, body: { conversationId: dm, kind: 'video' } })).body.call;
+    expect(call).toMatchObject({ direction: 'outgoing', status: 'ringing', kind: 'video', peer: { username: 'ben' } });
+    await waitFor(() => b.events.some((e) => e.type === 'call_ring' && e.callId === call.id));
+    expect((await ctx.call('GET', `/calls/${call.id}`, { as: ben })).body.call).toMatchObject({ direction: 'incoming', peer: { username: 'ana' } });
+    expect((await ctx.call('GET', `/calls/${call.id}`, { as: cat })).status).toBe(404);
+    // Ana can't start a second call while this one rings.
+    expect((await ctx.call('POST', '/calls', { as: ana, body: { conversationId: dm, kind: 'audio' } })).status).toBe(409);
+
+    // Signaling goes to the other side only, and only from participants.
+    a.ws.send(JSON.stringify({ type: 'call_signal', callId: call.id, payload: { sealed: 'offer' } }));
+    c.ws.send(JSON.stringify({ type: 'call_signal', callId: call.id, payload: { sealed: 'intruder' } }));
+    await waitFor(() => b.events.some((e) => e.type === 'call_signal'));
+    expect(b.events.filter((e) => e.type === 'call_signal')).toEqual([{ type: 'call_signal', callId: call.id, from: ana.id, payload: { sealed: 'offer' } }]);
+    expect(a.events.some((e) => e.type === 'call_signal')).toBe(false);
+
+    expect((await ctx.call('POST', `/calls/${call.id}/answer`, { as: ana })).status).toBe(403);
+    expect((await ctx.call('POST', `/calls/${call.id}/answer`, { as: ben })).body.call.status).toBe('active');
+    await waitFor(() => a.events.some((e) => e.type === 'call_update'));
+    ctx.advance(95_000);
+    expect((await ctx.call('POST', `/calls/${call.id}/end`, { as: ana })).body.call).toMatchObject({ status: 'answered', durationSeconds: 95 });
+
+    // After it ends, nothing more is relayed.
+    const before = a.events.length;
+    b.ws.send(JSON.stringify({ type: 'call_signal', callId: call.id, payload: { sealed: 'late' } }));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(a.events.slice(before).some((e) => e.type === 'call_signal')).toBe(false);
+
+    // Declined, cancelled and rung-out calls.
+    const declined = (await ctx.call('POST', '/calls', { as: ana, body: { conversationId: dm, kind: 'audio' } })).body.call;
+    await ctx.call('POST', `/calls/${declined.id}/end`, { as: ben });
+    const cancelled = (await ctx.call('POST', '/calls', { as: ben, body: { conversationId: dm, kind: 'audio' } })).body.call;
+    await ctx.call('POST', `/calls/${cancelled.id}/end`, { as: ben });
+    const missed = (await ctx.call('POST', '/calls', { as: ana, body: { conversationId: dm, kind: 'audio' } })).body.call;
+    ctx.advance(60_000);
+    const history = (await ctx.call('GET', '/calls', { as: ben })).body.calls;
+    expect(history.map((h: any) => [h.id, h.direction, h.status])).toEqual([
+      [missed.id, 'incoming', 'missed'],
+      [cancelled.id, 'outgoing', 'cancelled'],
+      [declined.id, 'incoming', 'declined'],
+      [call.id, 'incoming', 'answered'],
+    ]);
+    expect((await ctx.call('GET', '/calls/ice', { as: ana })).body.iceServers).toEqual([]);
+    for (const s of [a, b, c]) s.ws.close();
+  });
+
+  it('no calls in groups, across a block, or to someone already on a call', async () => {
+    const [ana, ben, cat] = [await ctx.signup('ana'), await ctx.signup('ben'), await ctx.signup('cat')];
+    const accepted = async (x: Person, y: Person) => {
+      const id = await ctx.direct(x, y);
+      await ctx.send(x, id, { kind: 'text', text: 'hi' });
+      await ctx.call('POST', `/conversations/${id}/accept`, { as: y });
+      return id;
+    };
+    const ab = await accepted(ana, ben);
+    const cb = await accepted(cat, ben);
+    const group = (await ctx.call('POST', '/conversations/group', { as: ana, body: { title: 'g', memberIds: [ben.id] } })).body.conversation.id;
+    expect((await ctx.call('POST', '/calls', { as: ana, body: { conversationId: group, kind: 'audio' } })).status).toBe(400);
+
+    await ctx.call('POST', '/calls', { as: ana, body: { conversationId: ab, kind: 'audio' } });
+    ctx.advance(1000);
+    const busy = await ctx.call('POST', '/calls', { as: cat, body: { conversationId: cb, kind: 'audio' } });
+    expect(busy).toMatchObject({ status: 409, body: { error: "They're on another call" } });
+    expect((await ctx.call('GET', '/calls', { as: ben })).body.calls.map((c: any) => c.status)).toEqual(['missed', 'ringing']);
+
+    await ctx.call('POST', '/blocks', { as: ben, body: { userId: cat.id } });
+    ctx.advance(60_000);
+    expect((await ctx.call('POST', '/calls', { as: cat, body: { conversationId: cb, kind: 'audio' } })).status).toBe(403);
+  });
+
   it('closes sockets that fail to authenticate', async () => {
     const url = await ctx.listen();
     await expect(connect(url, 'not-a-token').ready).rejects.toThrow('closed 4001');
