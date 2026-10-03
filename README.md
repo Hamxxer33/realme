@@ -121,6 +121,13 @@ The app uses native modules (libsodium, secure storage), so it needs a
 use EAS: `npx eas-cli@latest build --profile development`. Push notifications
 need an EAS project id (`npx eas-cli@latest init`).
 
+### Deploying the server (Railway)
+
+`railway.json` builds `apps/server/Dockerfile` (server dependencies only) and
+runs `npm run migrate` before each deploy. Set `DATABASE_URL` (Neon pooled
+string), `JWT_SECRET`, and the `S3_*` variables (a Railway bucket works) on the
+service, then point the app's `EXPO_PUBLIC_API_URL` at the service's domain.
+
 **Calls** need a TURN server in production — many mobile networks block direct
 peer-to-peer connections. Run [coturn](https://github.com/coturn/coturn) with
 `use-auth-secret` and `static-auth-secret=<secret>`, then set on the server:
