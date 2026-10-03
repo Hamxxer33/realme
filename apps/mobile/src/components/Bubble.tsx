@@ -8,12 +8,14 @@ import { EncryptedImage, VoiceNote } from './Media';
 
 const time = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
-export const Bubble = memo(function Bubble({ item, mine, reactions, maxWidth, showReceipt, onLongPress, onRetry, onOpenImage }: {
+export const Bubble = memo(function Bubble({ item, mine, senderName, reactions, maxWidth, receipt, onLongPress, onRetry, onOpenImage }: {
   item: ChatItem;
   mine: boolean;
+  /** Shown above the bubble in group chats. */
+  senderName?: string;
   reactions?: string[];
   maxWidth: number;
-  showReceipt: boolean;
+  receipt: 'sent' | 'read' | null;
   onLongPress: (item: ChatItem) => void;
   onRetry: (clientId: string) => void;
   onOpenImage: (uri: string) => void;
@@ -25,7 +27,7 @@ export const Bubble = memo(function Bubble({ item, mine, reactions, maxWidth, sh
       <Animated.View entering={FadeInDown.springify().damping(16)} style={styles.nudgeRow}>
         <View style={styles.nudge}>
           <Icon name="heart" size={16} color={colors.rose} filled />
-          <Text style={styles.nudgeText}>{mine ? 'You sent a little love' : 'Thinking of you'}</Text>
+          <Text style={styles.nudgeText}>{mine ? 'You sent a little love' : `${senderName ? `${senderName} is t` : 'T'}hinking of you`}</Text>
           <Text style={styles.nudgeTime}>{time(item.createdAt)}</Text>
         </View>
       </Animated.View>
@@ -36,8 +38,8 @@ export const Bubble = memo(function Bubble({ item, mine, reactions, maxWidth, sh
   const meta = (
     <View style={styles.metaRow}>
       <Text style={[styles.meta, mine ? styles.metaMine : null]}>{time(item.createdAt)}</Text>
-      {mine && item.status === 'sent' && showReceipt ? (
-        <Icon name={item.readAt ? 'checks' : 'check'} size={14} color={colors.onRoseMuted} strokeWidth={2} />
+      {mine && item.status === 'sent' && receipt ? (
+        <Icon name={receipt === 'read' ? 'checks' : 'check'} size={14} color={colors.onRoseMuted} strokeWidth={2} />
       ) : null}
     </View>
   );
@@ -47,8 +49,9 @@ export const Bubble = memo(function Bubble({ item, mine, reactions, maxWidth, sh
       entering={FadeInDown.springify().damping(18)}
       style={[styles.row, mine ? styles.rowMine : styles.rowTheirs]}
     >
+      {senderName && !mine ? <Text style={styles.sender}>{senderName}</Text> : null}
       <Pressable
-        onLongPress={() => item.status === 'sent' && onLongPress(item)}
+        onLongPress={() => item.status === 'sent' && item.body && onLongPress(item)}
         delayLongPress={280}
         accessibilityHint="Long press to react"
         style={[
@@ -59,8 +62,10 @@ export const Bubble = memo(function Bubble({ item, mine, reactions, maxWidth, sh
           item.status === 'pending' && { opacity: 0.7 },
         ]}
       >
-        {body === null ? (
-          <Text style={[styles.text, styles.undecryptable]}>Couldn't decrypt this message</Text>
+        {body === undefined ? (
+          <Text style={[styles.text, styles.undecryptable]}>Decrypting…</Text>
+        ) : body === null ? (
+          <Text style={[styles.text, styles.undecryptable, mine && styles.textMine]}>Can't show this message</Text>
         ) : body.kind === 'text' ? (
           <Text style={[styles.text, mine && styles.textMine]} selectable>{body.text}</Text>
         ) : body.kind === 'image' ? (
@@ -98,6 +103,7 @@ const styles = StyleSheet.create({
   text: { fontFamily: fonts.regular, fontSize: 16, lineHeight: 22, color: colors.ink },
   textMine: { color: colors.onRose },
   undecryptable: { fontStyle: 'italic', color: colors.inkMuted },
+  sender: { fontFamily: fonts.bold, fontSize: 12, color: colors.inkMuted, marginLeft: 12, marginBottom: 2 },
   metaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4 },
   meta: { fontFamily: fonts.medium, fontSize: 11, color: colors.inkMuted },
   metaMine: { color: colors.onRoseMuted },

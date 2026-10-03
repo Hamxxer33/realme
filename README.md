@@ -1,9 +1,17 @@
 # Realme
 
-A private, end-to-end encrypted chat app for couples. Two people pair with an
-invite code and get a space that only they can read: messages, photos, voice
-notes, a "thinking of you" heart, reactions, a shared memories timeline, and an
-anniversary counter.
+An end-to-end encrypted messenger with a public timeline. Find people by
+@username, chat one-on-one or in groups (photos, voice notes, reactions, a
+"thinking of you" heart), and share moments on the timeline.
+
+<p>
+  <img src="docs/screenshots/16-chats-list.png" width="200" alt="Chat list">
+  <img src="docs/screenshots/10-dm-chat.png" width="200" alt="Chat">
+  <img src="docs/screenshots/14-group-chat.png" width="200" alt="Group chat">
+  <img src="docs/screenshots/18-timeline.png" width="200" alt="Timeline">
+</p>
+
+All screens: [`docs/screenshots/`](docs/screenshots).
 
 ```
 apps/mobile      Expo (React Native) app — iOS & Android
@@ -11,41 +19,55 @@ apps/server      Hono API + WebSocket server on Postgres (Neon)
 packages/crypto  End-to-end encryption shared by both (libsodium)
 ```
 
+## Features
+
+- **@usernames** — search for anyone by username or name; no invite codes.
+- **Chats** — one-on-one and groups (up to 64), typing indicators, read
+  receipts, reactions, photos, voice notes, retries that never double-send.
+- **Message requests** — a first message from someone you don't chat with
+  lands in Requests. They can't tell you've seen it until you accept.
+- **Groups** — admins rename, add and remove people; leaving hands admin to
+  someone else; the last person out deletes the group and its media.
+- **Timeline** — public posts with an optional photo, likes and comments.
+- **Safety** — block (both directions: no chats, no group adds, hidden from
+  search, profiles and the timeline) and report people, posts, comments or chats.
+
 ## How the encryption works
 
-- **Keys live on the phones.** At sign-up each phone generates an X25519 key
-  pair. The secret key is stored in the iOS Keychain / Android Keystore.
-- **Couple messages** are sealed with `crypto_box` (X25519 + XSalsa20-Poly1305)
-  using one partner's secret key and the other's public key, so either partner —
-  and nobody else — can open them. The couple id and sender id are sealed inside
-  each message and checked on open, so the server can't replay or relabel one.
-- **Photos and voice notes** are encrypted on the phone with a fresh random key
-  per file (XChaCha20-Poly1305) before upload. That key travels inside the
-  encrypted message; storage only ever holds ciphertext.
-- **Memories and couple settings** (anniversary, couple name) are encrypted the
-  same way as messages.
-- **The password never leaves the phone.** It's stretched with Argon2id into two
-  independent secrets: one logs in (the server stores only an Argon2 hash of it),
-  the other wraps a backup of the secret key. Signing in on a new phone downloads
-  that backup and unwraps it locally, so history still decrypts.
-- **Safety number.** Settings shows a 25-digit number derived from both public
-  keys. If it matches on both phones, the server hasn't swapped in its own key.
+- **Keys live on the phones.** Each account has an X25519 key pair generated on
+  the device; the secret key stays in the iOS Keychain / Android Keystore.
+- **Messages** get a fresh random key each. The message is encrypted with it
+  (XChaCha20-Poly1305), and the key is sealed separately for every member with
+  `crypto_box`, bound to a hash of the ciphertext. So:
+  - only people who were members when it was sent can read it;
+  - the server and other members can't forge a message in someone's name or
+    swap one message's content for another's;
+  - the chat id and sender are sealed inside, so a message can't be moved
+    between chats or relabelled.
+- **Photos and voice notes** in chats are encrypted on the phone with their own
+  key, which travels inside the encrypted message.
+- **The password never leaves the phone.** It's stretched with Argon2id into
+  two secrets: one logs in (the server stores only an Argon2 hash of it), the
+  other wraps a backup of the secret key — so signing in on a new phone
+  restores your key and history.
+- **Safety number.** Chat info shows a number derived from both people's keys.
+  If it matches on both phones, the server hasn't swapped in its own key.
 
-**What the server can see:** emails, display names, who is paired with whom,
-message timestamps and sizes, read receipts, typing indicators, and when a push
-notification is sent. It cannot see message text, photos, voice notes,
-memories, or the anniversary.
+**Not encrypted (by design):** timeline posts, comments and post photos are
+public. The server also sees usernames, who is in which chat, group names,
+message timestamps and sizes, read receipts, typing, and reports.
 
-**Known limitations (v1):**
+**Known limitations:**
 
-- No forward secrecy — if a secret key leaks, past messages can be decrypted.
-  A double-ratchet protocol (as in Signal) would fix this.
-- One active device per account; signing in elsewhere reuses the same key.
-- Forgetting your password loses your history (by design: nobody else holds the key).
-- Decrypted photos/voice notes are cached inside the app's private storage.
+- No forward secrecy — a leaked secret key exposes past messages. A
+  double-ratchet / MLS protocol would fix this.
+- One device key per account (signing in elsewhere reuses it).
+- Forgetting your password loses your chat history (nobody else holds the key).
+- Reports of encrypted chats only include what the reporter chooses to paste;
+  there is no moderation dashboard yet (reports are stored in the `reports` table).
 - Real-time delivery is single-instance (in-memory hub). Running more than one
-  server instance needs a shared pub/sub (e.g. Postgres `LISTEN/NOTIFY` on a
-  direct Neon connection, or Redis).
+  server needs shared pub/sub (Postgres `LISTEN/NOTIFY` on a direct Neon
+  connection, or Redis).
 
 ## Running it
 
@@ -63,8 +85,8 @@ npm run dev
 ```
 
 No bucket yet? Leave the `S3_*` lines out and set `STORAGE_DIR=./.media` and
-`PUBLIC_URL=http://<your-computer's-LAN-IP>:8787` — the server then stores
-(encrypted) media on disk. Development only.
+`PUBLIC_URL=http://<your-computer's-LAN-IP>:8787` — the server then stores media
+on disk. Development only.
 
 ```bash
 # App
@@ -78,8 +100,9 @@ The app uses native modules (libsodium, secure storage), so it needs a
 use EAS: `npx eas-cli@latest build --profile development`. Push notifications
 need an EAS project id (`npx eas-cli@latest init`).
 
-The web target (`npx expo start --web`) works as a development preview for UI
-work; keys are kept in `sessionStorage` there, so don't treat it as secure.
+The web target (`npx expo start --web`, with `CORS_ORIGIN` set on the server)
+works as a development preview; keys are kept in `sessionStorage` there, so
+don't treat it as secure.
 
 ## Tests
 

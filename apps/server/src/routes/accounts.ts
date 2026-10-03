@@ -134,6 +134,14 @@ export function registerAccounts(app: App, ctx: Ctx) {
     return c.json({ users: rows.map(publicUser) });
   });
 
+  /** Public key lookup for people who have since left a chat (to verify their old messages). */
+  app.get('/users/id/:id', auth, zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
+    const [user] = await db.select().from(users)
+      .where(and(eq(users.id, c.req.valid('param').id), not(blockRelation(users.id, c.var.user.id))));
+    if (!user) fail(404, 'User not found');
+    return c.json({ user: publicUser(user) });
+  });
+
   app.get('/users/:username', auth, zValidator('param', z.object({ username })), async (c) => {
     const me = c.var.user;
     const [user] = await db.select().from(users).where(eq(users.username, c.req.valid('param').username));

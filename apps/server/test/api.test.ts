@@ -166,7 +166,9 @@ describe('accounts', () => {
     expect(found).toEqual(['anabelle']); // not yourself
     const byName = (await ctx.call('GET', '/users/search?q=Belle', { as: ana })).body.users.map((u: { username: string }) => u.username);
     expect(byName).toEqual(['anabelle']); // display-name match
-    expect((await ctx.call('GET', '/users/ben', { as: ana })).body.user.username).toBe('ben');
+    const ben = (await ctx.call('GET', '/users/ben', { as: ana })).body.user;
+    expect(ben.username).toBe('ben');
+    expect((await ctx.call('GET', `/users/id/${ben.id}`, { as: ana })).body.user.publicKey).toBe(ben.publicKey);
   });
 });
 

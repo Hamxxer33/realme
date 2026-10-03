@@ -10,6 +10,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { resetConversations, startConversationSync } from '../lib/conversations';
 import { SessionProvider, useSession } from '../lib/session';
 import { colors } from '../theme';
 
@@ -29,29 +30,34 @@ export default function RootLayout() {
 
 function Routes() {
   const { status, me } = useSession();
-  const paired = Boolean(me?.couple?.paired);
 
   useEffect(() => {
     if (status !== 'loading') void SplashScreen.hideAsync();
-  }, [status]);
+    if (status === 'signedIn' && me) startConversationSync(me.id);
+    if (status === 'signedOut') resetConversations();
+  }, [status, me]);
 
   if (status === 'loading') return null;
+  const signedIn = status === 'signedIn';
 
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg }, animation: 'slide_from_right' }}>
-      <Stack.Protected guard={status === 'signedOut'}>
+      <Stack.Protected guard={!signedIn}>
         <Stack.Screen name="welcome" options={{ animation: 'fade' }} />
         <Stack.Screen name="sign-up" />
         <Stack.Screen name="sign-in" />
       </Stack.Protected>
-      <Stack.Protected guard={status === 'signedIn' && !paired}>
-        <Stack.Screen name="pair" options={{ animation: 'fade' }} />
-      </Stack.Protected>
-      <Stack.Protected guard={status === 'signedIn' && paired}>
-        <Stack.Screen name="index" options={{ animation: 'fade' }} />
-        <Stack.Screen name="memories" />
-        <Stack.Screen name="memory-new" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="settings" />
+      <Stack.Protected guard={signedIn}>
+        <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
+        <Stack.Screen name="chat/[id]" />
+        <Stack.Screen name="chat-info/[id]" />
+        <Stack.Screen name="new-chat" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="new-group" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="requests" />
+        <Stack.Screen name="user/[username]" />
+        <Stack.Screen name="post/[id]" />
+        <Stack.Screen name="compose" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="blocked" />
         <Stack.Screen name="photo" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
       </Stack.Protected>
     </Stack>

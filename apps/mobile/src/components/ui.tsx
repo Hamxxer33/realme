@@ -18,9 +18,14 @@ import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-na
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, fonts, motion, radius, shadow, space } from '../theme';
 
-export function Screen({ children, style }: { children: ReactNode; style?: ViewStyle }) {
+export function Screen({ children, style, edges = ['top', 'bottom'] }: {
+  children: ReactNode;
+  style?: ViewStyle;
+  /** Tab screens skip the bottom edge — the tab bar handles it. */
+  edges?: Array<'top' | 'bottom'>;
+}) {
   return (
-    <SafeAreaView style={[styles.screen, style]} edges={['top', 'bottom']}>
+    <SafeAreaView style={[styles.screen, style]} edges={edges}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {children}
       </KeyboardAvoidingView>

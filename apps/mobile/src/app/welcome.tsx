@@ -13,15 +13,15 @@ export default function Welcome() {
           <View style={styles.mark}>
             <Icon name="heart" size={44} color={colors.rose} filled />
           </View>
-          <Eyebrow>Just the two of you</Eyebrow>
-          <Title>A quiet little place for you and your person.</Title>
+          <Eyebrow>Private by default</Eyebrow>
+          <Title>Talk to the people you love.</Title>
           <Body muted>
-            Messages, photos and voice notes that only the two of you can read. Not even we can.
+            Chats, groups, photos and voice notes that only the people in them can read. Share moments on the timeline.
           </Body>
         </Animated.View>
 
         <Animated.View entering={FadeInDown.delay(150).duration(700).springify().damping(20)} style={styles.actions}>
-          <Button title="Create our space" onPress={() => router.push('/sign-up')} />
+          <Button title="Create account" onPress={() => router.push('/sign-up')} />
           <Button title="I already have an account" variant="ghost" onPress={() => router.push('/sign-in')} />
           <View style={styles.lockRow}>
             <Icon name="lock" size={14} color={colors.inkMuted} />

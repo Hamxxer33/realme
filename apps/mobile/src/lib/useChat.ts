@@ -1,7 +1,8 @@
 import type { MessageBody } from '@realme/crypto';
 import * as Crypto from 'expo-crypto';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, type MessageRow } from './api';
+import { ApiError, api, type ConversationView, type MessageRow } from './api';
+import { markReadLocally, refreshConversation } from './conversations';
 import { uploadEncrypted } from './media';
 import { realtime } from './realtime';
 import { useSession } from './session';
@@ -11,8 +12,7 @@ export interface ChatItem {
   clientId: string;
   senderId: string;
   createdAt: string;
-  readAt: string | null;
-  body: MessageBody | null; // null = couldn't decrypt
+  body: MessageBody | null | undefined; // undefined = still decrypting, null = can't decrypt
   status: 'sent' | 'pending' | 'failed';
 }
 
@@ -20,52 +20,69 @@ const PAGE = 40;
 const TYPING_SEND_MS = 3000;
 const TYPING_SHOW_MS = 5000;
 
-export function useChat() {
-  const { me, seal, open } = useSession();
-  const myId = me?.user.id ?? '';
-  const partnerId = me?.couple?.partner?.id ?? '';
+export function useChat(conversation: ConversationView) {
+  const { me, encrypt, decrypt, publicKeyOf } = useSession();
+  const myId = me?.id ?? '';
+  const conversationId = conversation.id;
+  const convRef = useRef(conversation);
+  convRef.current = conversation;
 
-  const [items, setItems] = useState<Map<string, ChatItem>>(new Map());
+  const [rows, setRows] = useState<Map<string, MessageRow>>(new Map());
+  const [pending, setPending] = useState<Map<string, ChatItem>>(new Map());
+  const [bodies, setBodies] = useState<Map<string, MessageBody | null>>(new Map());
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [partnerTyping, setPartnerTyping] = useState(false);
-  const retryBodies = useRef(new Map<string, MessageBody>());
+  const [typing, setTyping] = useState<Map<string, number>>(new Map());
   const lastTypingSent = useRef(0);
-  const typingTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
 
-  const decrypt = useCallback((row: MessageRow): ChatItem => {
-    let body: MessageBody | null = null;
-    try {
-      body = open<MessageBody>(row, row.senderId);
-    } catch {
-      body = null;
-    }
-    return { id: row.id, clientId: row.clientId, senderId: row.senderId, createdAt: row.createdAt, readAt: row.readAt, body, status: 'sent' };
-  }, [open]);
-
-  const merge = useCallback((rows: MessageRow[]) => {
-    setItems((prev) => {
+  const merge = useCallback((incoming: MessageRow[]) => {
+    if (!incoming.length) return;
+    setRows((prev) => {
       const next = new Map(prev);
-      for (const row of rows) {
-        next.delete(row.clientId); // replace the optimistic copy
-        next.set(row.id, decrypt(row));
-        retryBodies.current.delete(row.clientId);
-      }
+      for (const row of incoming) next.set(row.id, row);
       return next;
     });
-  }, [decrypt]);
+    setPending((prev) => {
+      if (!incoming.some((r) => prev.has(r.clientId))) return prev;
+      const next = new Map(prev);
+      for (const row of incoming) next.delete(row.clientId);
+      return next;
+    });
+  }, []);
 
-  const itemsRef = useRef(items);
-  itemsRef.current = items;
+  // Decrypt anything new. Senders who left the chat need a key lookup first.
+  useEffect(() => {
+    const todo = [...rows.values()].filter((r) => !bodies.has(r.id));
+    if (!todo.length) return;
+    let alive = true;
+    (async () => {
+      const done = new Map<string, MessageBody | null>();
+      for (const row of todo) {
+        const senderKey = await publicKeyOf(row.senderId, convRef.current);
+        try {
+          done.set(row.id, senderKey ? decrypt<MessageBody>(row, senderKey) : null);
+        } catch {
+          done.set(row.id, null);
+        }
+      }
+      if (alive) setBodies((prev) => new Map([...prev, ...done]));
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [rows, bodies, decrypt, publicKeyOf]);
+
   const initialLoaded = useRef(false);
-
   /** First load, or catch up after a reconnect — paging back until we reach messages we already have. */
   const loadLatest = useCallback(async () => {
     let before: string | undefined;
     for (let page = 0; page < 10; page++) {
-      const query = `/messages?limit=${PAGE}${before ? `&before=${before}` : ''}`;
-      const res = await api<{ messages: MessageRow[]; hasMore: boolean }>('GET', query);
-      const caughtUp = res.messages.some((m) => itemsRef.current.has(m.id));
+      const res = await api<{ messages: MessageRow[]; hasMore: boolean }>(
+        'GET', `/conversations/${conversationId}/messages?limit=${PAGE}${before ? `&before=${before}` : ''}`,
+      );
+      const caughtUp = res.messages.some((m) => rowsRef.current.has(m.id));
       merge(res.messages);
       if (!initialLoaded.current) {
         initialLoaded.current = true;
@@ -75,154 +92,148 @@ export function useChat() {
       if (caughtUp || !res.hasMore) return;
       before = res.messages[res.messages.length - 1]?.id;
     }
-  }, [merge]);
-
-  const sorted = useMemo(
-    () => [...items.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-    [items],
-  );
+  }, [conversationId, merge]);
 
   const loadOlder = useCallback(async () => {
     if (loading || !hasMore) return;
-    const oldest = [...sorted].reverse().find((i) => i.status === 'sent');
+    const oldest = [...rowsRef.current.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0];
     if (!oldest) return;
     setLoading(true);
     try {
-      const res = await api<{ messages: MessageRow[]; hasMore: boolean }>('GET', `/messages?limit=${PAGE}&before=${oldest.id}`);
+      const res = await api<{ messages: MessageRow[]; hasMore: boolean }>(
+        'GET', `/conversations/${conversationId}/messages?limit=${PAGE}&before=${oldest.id}`,
+      );
       merge(res.messages);
       setHasMore(res.hasMore);
     } finally {
       setLoading(false);
     }
-  }, [loading, hasMore, sorted, merge]);
+  }, [conversationId, loading, hasMore, merge]);
 
   useEffect(() => {
-    if (!partnerId) return;
     void loadLatest().catch(() => {});
     return realtime.subscribe((evt) => {
-      if (evt.type === 'message') {
+      if (evt.type === 'message' && evt.conversationId === conversationId) {
         merge([evt.message]);
-        if (evt.message.senderId === partnerId) setPartnerTyping(false);
-      } else if (evt.type === 'read' && evt.readerId === partnerId) {
-        setItems((prev) => {
-          const anchor = [...prev.values()].find((i) => i.id === evt.upTo);
-          if (!anchor) return prev;
+        setTyping((prev) => {
+          if (!prev.has(evt.message.senderId)) return prev;
           const next = new Map(prev);
-          for (const [k, item] of next) {
-            if (item.senderId === myId && !item.readAt && item.createdAt <= anchor.createdAt) {
-              next.set(k, { ...item, readAt: evt.readAt });
-            }
-          }
+          next.delete(evt.message.senderId);
           return next;
         });
-      } else if (evt.type === 'typing' && evt.userId === partnerId) {
-        setPartnerTyping(true);
-        clearTimeout(typingTimer.current);
-        typingTimer.current = setTimeout(() => setPartnerTyping(false), TYPING_SHOW_MS);
+      } else if (evt.type === 'typing' && evt.conversationId === conversationId) {
+        setTyping((prev) => new Map(prev).set(evt.userId, Date.now() + TYPING_SHOW_MS));
       } else if (evt.type === 'connected') {
         void loadLatest().catch(() => {});
       }
     });
-  }, [partnerId, myId, merge, loadLatest]);
+  }, [conversationId, merge, loadLatest]);
 
-  useEffect(() => () => clearTimeout(typingTimer.current), []);
+  // Expire typing indicators.
+  useEffect(() => {
+    if (!typing.size) return;
+    const t = setInterval(() => {
+      setTyping((prev) => {
+        const now = Date.now();
+        const next = new Map([...prev].filter(([, until]) => until > now));
+        return next.size === prev.size ? prev : next;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [typing.size]);
 
-  const post = useCallback(async (clientId: string, body: MessageBody) => {
+  const post = useCallback(async (clientId: string, body: MessageBody, retried = false): Promise<void> => {
     try {
-      const { message } = await api<{ message: MessageRow }>('POST', '/messages', { ...seal(body), clientId });
+      const enc = encrypt(convRef.current, body);
+      const { message } = await api<{ message: MessageRow }>('POST', `/conversations/${conversationId}/messages`, { ...enc, clientId });
       merge([message]);
-    } catch {
-      setItems((prev) => {
+      setBodies((prev) => new Map(prev).set(message.id, body));
+    } catch (err) {
+      // Someone joined or left since we last looked: refresh members and re-encrypt once.
+      if (err instanceof ApiError && err.status === 409 && !retried) {
+        const fresh = await refreshConversation(conversationId);
+        if (fresh) {
+          convRef.current = fresh;
+          return post(clientId, body, true);
+        }
+      }
+      setPending((prev) => {
         const item = prev.get(clientId);
-        if (!item) return prev;
-        return new Map(prev).set(clientId, { ...item, status: 'failed' });
+        return item ? new Map(prev).set(clientId, { ...item, status: 'failed' }) : prev;
       });
     }
-  }, [seal, merge]);
+  }, [conversationId, encrypt, merge]);
 
   const send = useCallback((body: MessageBody) => {
     const clientId = Crypto.randomUUID();
-    retryBodies.current.set(clientId, body);
-    setItems((prev) => new Map(prev).set(clientId, {
-      id: clientId,
-      clientId,
-      senderId: myId,
-      createdAt: new Date().toISOString(),
-      readAt: null,
-      body,
-      status: 'pending',
+    // Sending clears my typing indicator on the other phones, so the next keystroke should announce it again.
+    lastTypingSent.current = 0;
+    setPending((prev) => new Map(prev).set(clientId, {
+      id: clientId, clientId, senderId: myId, createdAt: new Date().toISOString(), body, status: 'pending',
     }));
     void post(clientId, body);
   }, [myId, post]);
 
   const retry = useCallback((clientId: string) => {
-    const body = retryBodies.current.get(clientId);
-    if (!body) return;
-    setItems((prev) => {
-      const item = prev.get(clientId);
-      return item ? new Map(prev).set(clientId, { ...item, status: 'pending' }) : prev;
-    });
-    void post(clientId, body); // same clientId, so the server dedupes
-  }, [post]);
+    const item = pending.get(clientId);
+    if (!item?.body) return;
+    setPending((prev) => new Map(prev).set(clientId, { ...item, status: 'pending' }));
+    void post(clientId, item.body); // same clientId, so the server dedupes
+  }, [pending, post]);
 
   const sendMedia = useCallback(async (
     kind: 'image' | 'voice',
     localUri: string,
     meta: { mime: string; width?: number; height?: number; durationMs?: number },
   ) => {
-    const media = await uploadEncrypted(localUri, meta);
+    const media = await uploadEncrypted(localUri, meta, conversationId);
     send(kind === 'image' ? { kind: 'image', media } : { kind: 'voice', media, durationMs: meta.durationMs ?? 0 });
-  }, [send]);
+  }, [send, conversationId]);
 
   const notifyTyping = useCallback(() => {
     const now = Date.now();
     if (now - lastTypingSent.current > TYPING_SEND_MS) {
       lastTypingSent.current = now;
-      realtime.send({ type: 'typing' });
+      realtime.send({ type: 'typing', conversationId });
     }
-  }, []);
+  }, [conversationId]);
 
-  const markRead = useCallback(() => {
-    const newestUnread = sorted.find((i) => i.senderId === partnerId && !i.readAt && i.status === 'sent');
-    if (!newestUnread) return;
-    void api('POST', '/messages/read', { upTo: newestUnread.id }).catch(() => {});
-    setItems((prev) => {
-      const next = new Map(prev);
-      const readAt = new Date().toISOString();
-      for (const [k, item] of next) {
-        if (item.senderId === partnerId && !item.readAt && item.createdAt <= newestUnread.createdAt) {
-          next.set(k, { ...item, readAt });
-        }
-      }
-      return next;
-    });
-  }, [sorted, partnerId]);
-
-  // Reactions are messages too; fold them onto their targets instead of listing them.
+  // Newest first, for an inverted list. Reactions fold onto their targets.
   const { messages, reactions } = useMemo(() => {
-    const reactions = new Map<string, Map<string, string>>(); // targetId -> senderId -> emoji
+    const all: ChatItem[] = [
+      ...[...rows.values()].map((r): ChatItem => ({
+        id: r.id, clientId: r.clientId, senderId: r.senderId, createdAt: r.createdAt, body: bodies.get(r.id), status: 'sent',
+      })),
+      ...pending.values(),
+    ].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    const reactions = new Map<string, Map<string, string>>();
     const messages: ChatItem[] = [];
-    for (const item of [...sorted].reverse()) {
+    for (const item of all) {
       if (item.body?.kind === 'reaction') {
         const forTarget = reactions.get(item.body.targetId) ?? new Map<string, string>();
-        if (item.body.emoji) forTarget.set(item.senderId, item.body.emoji);
-        else forTarget.delete(item.senderId);
+        forTarget.set(item.senderId, item.body.emoji);
         reactions.set(item.body.targetId, forTarget);
       } else {
         messages.push(item);
       }
     }
     return { messages: messages.reverse(), reactions };
-  }, [sorted]);
+  }, [rows, pending, bodies]);
+
+  const newestFromOthers = messages.find((m) => m.senderId !== myId && m.status === 'sent');
+  const markRead = useCallback(() => {
+    if (!newestFromOthers) return;
+    markReadLocally(conversationId);
+    void api('POST', `/conversations/${conversationId}/read`, { upTo: newestFromOthers.id }).catch(() => {});
+  }, [conversationId, newestFromOthers?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
-    messages, // newest first, for an inverted list
+    messages,
     reactions,
     hasMore,
     loading,
-    partnerTyping,
+    typingUserIds: [...typing.keys()],
     myId,
-    partnerId,
     loadOlder,
     sendText: (text: string) => send({ kind: 'text', text }),
     sendNudge: () => send({ kind: 'nudge' }),

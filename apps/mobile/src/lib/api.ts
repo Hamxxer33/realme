@@ -1,4 +1,4 @@
-import type { Sealed } from '@realme/crypto';
+import type { Sealed, WrappedKey } from '@realme/crypto';
 import { API_URL } from './config';
 
 export class ApiError extends Error {
@@ -40,49 +40,64 @@ export async function api<T>(method: string, path: string, body?: unknown): Prom
   return data as T;
 }
 
-// ---- response shapes (mirror apps/server/src/app.ts) ----
+// ---- response shapes (mirror apps/server/src/routes) ----
 
 export interface PublicUser {
   id: string;
+  username: string;
+  displayName: string;
+  bio: string;
+  publicKey: string;
+}
+
+export interface Me extends PublicUser {
   email: string;
-  displayName: string;
-  publicKey: string;
 }
 
-export interface Partner {
-  id: string;
-  displayName: string;
-  publicKey: string;
-  online: boolean;
-}
-
-export interface CoupleView {
-  id: string;
-  paired: boolean;
-  pairedAt: string | null;
-  inviteCode: string | null;
-  inviteExpiresAt: string | null;
-  settings: (Sealed & { updatedBy: string }) | null;
-  partner: Partner | null;
-}
-
-export interface MeResponse {
-  user: PublicUser;
-  couple: CoupleView | null;
+export interface MemberView extends PublicUser {
+  role: 'admin' | 'member';
+  status: 'accepted' | 'pending';
+  lastReadAt: string | null;
 }
 
 export interface MessageRow extends Sealed {
   id: string;
-  coupleId: string;
+  conversationId: string;
   senderId: string;
   clientId: string;
+  key: WrappedKey | null; // my copy; null if I joined after it was sent
   createdAt: string;
-  readAt: string | null;
 }
 
-export interface MemoryRow extends Sealed {
+export interface ConversationView {
   id: string;
-  coupleId: string;
-  authorId: string;
+  kind: 'direct' | 'group';
+  title: string | null;
   createdAt: string;
+  lastMessageAt: string | null;
+  myStatus: 'accepted' | 'pending';
+  myRole: 'admin' | 'member';
+  members: MemberView[];
+  lastMessage: MessageRow | null;
+  unreadCount: number;
 }
+
+export interface PostView {
+  id: string;
+  text: string;
+  media: { objectKey: string; width: number | null; height: number | null } | null;
+  createdAt: string;
+  author: PublicUser;
+  likeCount: number;
+  commentCount: number;
+  likedByMe: boolean;
+}
+
+export interface CommentView {
+  id: string;
+  text: string;
+  createdAt: string;
+  author: PublicUser;
+}
+
+export type ReportReason = 'spam' | 'harassment' | 'inappropriate' | 'impersonation' | 'underage' | 'other';

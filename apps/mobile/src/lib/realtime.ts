@@ -1,14 +1,12 @@
 import { AppState } from 'react-native';
-import type { MemoryRow, MessageRow } from './api';
+import type { MessageRow } from './api';
 import { WS_URL } from './config';
 
 export type RealtimeEvent =
-  | { type: 'message'; message: MessageRow }
-  | { type: 'read'; readerId: string; readAt: string; upTo: string }
-  | { type: 'typing'; userId: string }
-  | { type: 'memory'; memory: MemoryRow }
-  | { type: 'memory_deleted'; id: string }
-  | { type: 'couple_changed' }
+  | { type: 'message'; conversationId: string; message: MessageRow }
+  | { type: 'read'; conversationId: string; userId: string; lastReadAt: string }
+  | { type: 'typing'; conversationId: string; userId: string }
+  | { type: 'conversation_changed'; conversationId: string }
   | { type: 'connected' };
 
 type Listener = (event: RealtimeEvent) => void;
@@ -50,7 +48,7 @@ class Realtime {
     return () => void this.listeners.delete(fn);
   }
 
-  send(payload: { type: 'typing' }) {
+  send(payload: { type: 'typing'; conversationId: string }) {
     if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(payload));
   }
 

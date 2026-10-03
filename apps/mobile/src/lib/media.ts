@@ -10,6 +10,7 @@ import { getCrypto } from './sodium';
 export async function uploadEncrypted(
   localUri: string,
   meta: { mime: string; width?: number; height?: number },
+  conversationId: string,
 ): Promise<MediaRef> {
   const c = await getCrypto();
   const plain = await new File(localUri).bytes();
@@ -17,6 +18,7 @@ export async function uploadEncrypted(
 
   const { objectKey, url } = await api<{ objectKey: string; url: string }>('POST', '/media/upload-url', {
     size: ciphertext.length,
+    conversationId,
   });
   const tmp = new File(Paths.cache, `upload-${Date.now()}.bin`);
   tmp.write(ciphertext);
@@ -66,4 +68,26 @@ function cacheFile(media: { objectKey: string; mime: string }) {
   const id = media.objectKey.split('/').pop();
   const ext = media.mime.startsWith('audio/') ? 'm4a' : media.mime === 'image/png' ? 'png' : 'jpg';
   return new File(Paths.cache, `media-${id}.${ext}`);
+}
+
+/** Timeline photos are public, so they're uploaded as-is (no encryption). */
+export async function uploadPublic(localUri: string): Promise<string> {
+  const file = new File(localUri);
+  const size = file.size;
+  const { objectKey, url } = await api<{ objectKey: string; url: string }>('POST', '/media/upload-url', { size });
+  const res = await file.upload(url, { httpMethod: 'PUT', headers: { 'content-type': 'application/octet-stream' } });
+  if (res.status < 200 || res.status >= 300) throw new Error(`Upload failed (${res.status})`);
+  return objectKey;
+}
+
+const publicUrls = new Map<string, { url: Promise<string>; until: number }>();
+
+/** A short-lived URL for a public post photo, cached until shortly before it expires. */
+export function publicUrlFor(objectKey: string): Promise<string> {
+  const hit = publicUrls.get(objectKey);
+  if (hit && hit.until > Date.now()) return hit.url;
+  const url = api<{ url: string }>('POST', '/media/download-url', { objectKey }).then((r) => r.url);
+  url.catch(() => publicUrls.delete(objectKey));
+  publicUrls.set(objectKey, { url, until: Date.now() + 10 * 60 * 1000 });
+  return url;
 }
