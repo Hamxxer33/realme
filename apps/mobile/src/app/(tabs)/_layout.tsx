@@ -31,11 +31,11 @@ export default function TabsLayout() {
           title: 'Chats',
           tabBarIcon: ({ color }) => <Icon name="chat" color={String(color)} />,
           tabBarBadge: unread ? (unread > 99 ? '99+' : unread) : undefined,
-          tabBarBadgeStyle: { backgroundColor: colors.rose, fontFamily: fonts.bold, fontSize: 11 },
+          tabBarBadgeStyle: { backgroundColor: colors.roseFill, fontFamily: fonts.bold, fontSize: 11 },
         }}
       />
       <Tabs.Screen name="timeline" options={{ title: 'Timeline', tabBarIcon: ({ color }) => <Icon name="feed" color={String(color)} /> }} />
-      <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarIcon: ({ color }) => <Icon name="user" color={String(color)} /> }} />
+      <Tabs.Screen name="profile" options={{ title: 'You', tabBarIcon: ({ color }) => <Icon name="user" color={String(color)} /> }} />
     </Tabs>
   );
 }

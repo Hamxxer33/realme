@@ -7,7 +7,7 @@ import { Screen } from '../components/ui';
 import { api, type ConversationView } from '../lib/api';
 import { notify } from '../lib/confirm';
 import { upsert, useConversations } from '../lib/conversations';
-import { colors, fonts, radius, space } from '../theme';
+import { colors, fonts, radius, space, themed } from '../theme';
 
 /** Add one person to any group I administer. */
 export default function AddToGroup() {
@@ -51,10 +51,10 @@ export default function AddToGroup() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, paddingVertical: 12 },
   title: { fontFamily: fonts.bold, fontSize: 16, color: colors.ink },
   sub: { fontFamily: fonts.regular, fontSize: 14, color: colors.inkMuted },
   add: { fontFamily: fonts.bold, fontSize: 14, color: colors.rose, backgroundColor: colors.roseTint, paddingHorizontal: 14, paddingVertical: 7, borderRadius: radius.pill, overflow: 'hidden' },
   empty: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, color: colors.inkMuted, textAlign: 'center', padding: space.xl },
-});
+}));

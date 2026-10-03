@@ -19,6 +19,8 @@ export const users = pgTable('users', {
   keyBackupNonce: text('key_backup_nonce').notNull(),
   keyBackupCiphertext: text('key_backup_ciphertext').notNull(),
   pushToken: text('push_token'),
+  // Privacy: when off, others don't see when I've read their messages — and I don't see theirs.
+  readReceipts: boolean('read_receipts').notNull().default(true),
   createdAt: ts('created_at').notNull().defaultNow(),
 }, (t) => [
   uniqueIndex('users_email_unique').on(sql`lower(${t.email})`),

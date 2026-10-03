@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '../components/Icon';
+import { themed } from '../theme';
 
 export default function Photo() {
   const { uri } = useLocalSearchParams<{ uri: string }>();
@@ -18,7 +19,7 @@ export default function Photo() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0D0809' },
   top: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 16 },
   close: {
@@ -29,4 +30,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
+}));

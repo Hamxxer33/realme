@@ -14,7 +14,7 @@ import { forget, refreshConversation, upsert, useConversation } from '../../lib/
 import { conversationTitle, otherMembers } from '../../lib/format';
 import { useSession } from '../../lib/session';
 import { useChat, type ChatItem } from '../../lib/useChat';
-import { noWebOutline, colors, fonts, radius, shadow, space } from '../../theme';
+import { noWebOutline, colors, fonts, radius, shadow, space, themed } from '../../theme';
 
 const REACTIONS = ['❤️', '🥰', '😂', '😮', '😢', '🔥'];
 
@@ -247,7 +247,7 @@ function TopBar({ title, subtitle, avatar, onBack, onInfo }: {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: space.xs, paddingHorizontal: space.sm, paddingVertical: space.sm },
   headerButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   headerMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: space.sm },
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
   searchInput: { ...noWebOutline, flex: 1, height: '100%', fontFamily: fonts.regular, fontSize: 16, color: colors.ink },
   searchCancel: { fontFamily: fonts.bold, fontSize: 15, color: colors.rose },
   searchCount: { fontFamily: fonts.medium, fontSize: 13, color: colors.inkMuted, paddingHorizontal: space.lg, paddingBottom: space.xs },
-  scrim: { flex: 1, backgroundColor: 'rgba(46,30,36,0.25)', alignItems: 'center', justifyContent: 'center' },
+  scrim: { flex: 1, backgroundColor: colors.scrim, alignItems: 'center', justifyContent: 'center' },
   reactionPicker: { flexDirection: 'row', gap: space.xs, backgroundColor: colors.surface, borderRadius: radius.pill, padding: space.sm, ...shadow },
   reactionOption: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
-});
+}));

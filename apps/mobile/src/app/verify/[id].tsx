@@ -7,7 +7,7 @@ import { Screen } from '../../components/ui';
 import { useConversation } from '../../lib/conversations';
 import { otherMembers } from '../../lib/format';
 import { useSession } from '../../lib/session';
-import { colors, fonts, radius, shadow, space } from '../../theme';
+import { colors, fonts, radius, shadow, space, themed } from '../../theme';
 
 /** Compare-in-person verification for a 1:1 chat. */
 export default function Verify() {
@@ -47,13 +47,13 @@ export default function Verify() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   container: { padding: space.lg, gap: space.lg, alignItems: 'center' },
   pair: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginTop: space.md },
-  lock: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.rose, alignItems: 'center', justifyContent: 'center' },
+  lock: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.roseFill, alignItems: 'center', justifyContent: 'center' },
   title: { fontFamily: fonts.heavy, fontSize: 22, color: colors.ink },
   card: { alignSelf: 'stretch', backgroundColor: colors.surface, borderRadius: radius.lg, padding: space.lg, ...shadow },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', rowGap: space.md, columnGap: space.lg },
   group: { fontFamily: fonts.bold, fontSize: 26, letterSpacing: 2, color: colors.ink, fontVariant: ['tabular-nums'], width: 110, textAlign: 'center' },
   body: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, color: colors.inkMuted, textAlign: 'center' },
-});
+}));

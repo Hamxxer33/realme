@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Icon } from '../components/Icon';
 import { Body, Button, Eyebrow, Screen, Title } from '../components/ui';
-import { colors, fonts, radius, space } from '../theme';
+import { colors, fonts, radius, space, themed } from '../theme';
 
 export default function Welcome() {
   return (
@@ -33,7 +33,7 @@ export default function Welcome() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   container: { flex: 1, paddingHorizontal: space.lg, paddingVertical: space.xl, justifyContent: 'space-between' },
   hero: { gap: space.md, marginTop: space.xxl },
   mark: {
@@ -48,4 +48,4 @@ const styles = StyleSheet.create({
   actions: { gap: space.sm },
   lockRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: space.sm },
   lockText: { fontFamily: fonts.medium, fontSize: 13 },
-});
+}));

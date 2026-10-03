@@ -14,7 +14,7 @@ import { forget, upsert, useConversation, useConversations } from '../../lib/con
 import { conversationTitle, otherMembers } from '../../lib/format';
 import { useSession } from '../../lib/session';
 import { useChat } from '../../lib/useChat';
-import { colors, fonts, radius, shadow, space } from '../../theme';
+import { colors, fonts, radius, shadow, space, themed } from '../../theme';
 
 export default function ChatInfoScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -182,11 +182,11 @@ function ChatInfo({ conv }: { conv: ConversationView }) {
               <Switch
                 value={!conv.myMuted}
                 onValueChange={(on) => void setMuted(!on)}
-                trackColor={{ true: colors.rose, false: colors.surfaceMuted }}
-                thumbColor={colors.surface}
+                trackColor={{ true: colors.roseFill, false: colors.surfaceMuted }}
+                thumbColor="#FFFFFF"
                 ios_backgroundColor={colors.surfaceMuted}
                 // react-native-web colours the active thumb separately (teal by default).
-                {...({ activeThumbColor: colors.surface } as object)}
+                {...({ activeThumbColor: '#FFFFFF' } as object)}
                 accessibilityLabel="Notifications"
               />
             }
@@ -361,7 +361,7 @@ function MemberRow({ name, avatarName, seed, subtitle, badge, onPress, onRemove,
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.sm, paddingVertical: space.xs },
   headerButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   container: { paddingHorizontal: space.md, paddingBottom: space.xxl, gap: space.md },
@@ -385,10 +385,10 @@ const styles = StyleSheet.create({
   rowWrap: { flexDirection: 'row', alignItems: 'center' },
   row: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.md, paddingVertical: 12, minHeight: 56 },
   rowIcon: { width: 44, alignItems: 'center' },
-  accentIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.rose, alignItems: 'center', justifyContent: 'center' },
+  accentIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.roseFill, alignItems: 'center', justifyContent: 'center' },
   rowTitle: { fontFamily: fonts.bold, fontSize: 16, color: colors.ink },
   rowSub: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 19, color: colors.inkMuted, marginTop: 1 },
   rowRight: { paddingRight: space.md, paddingLeft: space.sm },
   badge: { fontFamily: fonts.bold, fontSize: 12, color: colors.rose, backgroundColor: colors.roseTint, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill, overflow: 'hidden' },
   remove: { fontFamily: fonts.bold, fontSize: 14, color: colors.danger },
-});
+}));

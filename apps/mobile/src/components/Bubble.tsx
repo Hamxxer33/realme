@@ -2,7 +2,7 @@ import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import type { ChatItem } from '../lib/useChat';
-import { colors, fonts, radius, shadow, space } from '../theme';
+import { colors, fonts, radius, shadow, space, themed } from '../theme';
 import { Icon } from './Icon';
 import { EncryptedImage, VoiceNote } from './Media';
 
@@ -92,14 +92,15 @@ export const Bubble = memo(function Bubble({ item, mine, senderName, reactions, 
   );
 });
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   row: { paddingHorizontal: space.md, marginVertical: 3 },
   rowMine: { alignItems: 'flex-end' },
   rowTheirs: { alignItems: 'flex-start' },
   bubble: { borderRadius: radius.md, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6, gap: 2 },
-  mine: { backgroundColor: colors.rose, borderBottomRightRadius: 6 },
+  mine: { backgroundColor: colors.roseFill, borderBottomRightRadius: 6 },
   theirs: { backgroundColor: colors.surface, borderBottomLeftRadius: 6, ...shadow, shadowOpacity: 0.05 },
-  imageBubble: { padding: 4, paddingTop: 4, paddingBottom: 4 },
+  // paddingHorizontal on .bubble would override a plain `padding`, so set both axes explicitly.
+  imageBubble: { paddingHorizontal: 4, paddingVertical: 4 },
   text: { fontFamily: fonts.regular, fontSize: 16, lineHeight: 22, color: colors.ink },
   textMine: { color: colors.onRose },
   undecryptable: { fontStyle: 'italic', color: colors.inkMuted },
@@ -141,4 +142,4 @@ const styles = StyleSheet.create({
   nudgeTime: { fontFamily: fonts.medium, fontSize: 12, color: colors.inkMuted },
   failed: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
   failedText: { fontFamily: fonts.medium, fontSize: 12, color: colors.danger },
-});
+}));

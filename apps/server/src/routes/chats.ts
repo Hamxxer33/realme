@@ -72,7 +72,8 @@ export function registerChats(app: App, ctx: Ctx) {
           ...publicUser(p.user),
           role: p.member.role,
           status: p.member.status,
-          lastReadAt: p.member.lastReadAt,
+          // Read receipts are mutual: hidden unless both of us share them.
+          lastReadAt: p.user.id === me.id || (me.readReceipts && p.user.readReceipts) ? p.member.lastReadAt : null,
         })),
         lastMessage: lastRow ? messageFor(rowFromRaw(lastRow), me.id) : null,
         unreadCount: unreadBy.get(conv.id) ?? 0,
@@ -368,7 +369,12 @@ export function registerChats(app: App, ctx: Ctx) {
         .set({ lastReadAt: sql`greatest(coalesce(${members.lastReadAt}, '-infinity'::timestamptz), (select created_at from messages where id = ${anchor.id}))` })
         .where(and(eq(members.conversationId, conversation.id), eq(members.userId, me.id)))
         .returning({ lastReadAt: members.lastReadAt });
-      hub.send(await memberIds(ctx, conversation.id), {
+      // Only people who also share read receipts learn that I've read (and only if I share mine).
+      const audience = me.readReceipts
+        ? (await db.select({ id: users.id }).from(members).innerJoin(users, eq(users.id, members.userId))
+          .where(and(eq(members.conversationId, conversation.id), eq(users.readReceipts, true)))).map((r) => r.id)
+        : [];
+      hub.send(new Set([me.id, ...audience]), {
         type: 'read', conversationId: conversation.id, userId: me.id, lastReadAt: updated!.lastReadAt!.toISOString(),
       });
       return c.json({ ok: true });

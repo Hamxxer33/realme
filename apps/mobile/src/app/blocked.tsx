@@ -5,7 +5,7 @@ import { Screen } from '../components/ui';
 import { UserRow } from '../components/UserRow';
 import { api, type PublicUser } from '../lib/api';
 import { notify } from '../lib/confirm';
-import { colors, fonts, radius, space } from '../theme';
+import { colors, fonts, radius, space, themed } from '../theme';
 
 export default function Blocked() {
   const [users, setUsers] = useState<PublicUser[] | null>(null);
@@ -44,9 +44,9 @@ export default function Blocked() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   pill: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: colors.roseTint },
   pillText: { fontFamily: fonts.bold, fontSize: 14, color: colors.rose },
   empty: { padding: space.xl, alignItems: 'center' },
   emptyText: { fontFamily: fonts.regular, fontSize: 15, color: colors.inkMuted },
-});
+}));

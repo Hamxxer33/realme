@@ -52,6 +52,7 @@ export interface PublicUser {
 
 export interface Me extends PublicUser {
   email: string;
+  readReceipts: boolean;
 }
 
 export interface MemberView extends PublicUser {

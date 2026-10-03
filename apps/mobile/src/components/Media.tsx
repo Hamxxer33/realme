@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { localUriFor } from '../lib/media';
-import { colors, fonts, radius } from '../theme';
+import { colors, fonts, radius, themed } from '../theme';
 import { Icon } from './Icon';
 
 function useDecrypted(media: MediaRef) {
@@ -85,7 +85,7 @@ export function VoiceNote({ media, durationMs, mine }: { media: MediaRef; durati
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   imageBox: {
     borderRadius: radius.md - 4,
     overflow: 'hidden',
@@ -99,4 +99,4 @@ const styles = StyleSheet.create({
   trackBg: { ...StyleSheet.absoluteFill, borderRadius: 2 },
   trackFill: { height: 4, borderRadius: 2 },
   duration: { fontFamily: fonts.medium, fontSize: 13, fontVariant: ['tabular-nums'], minWidth: 34, textAlign: 'right' },
-});
+}));

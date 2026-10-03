@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { noWebOutline, colors, fonts, motion, radius, shadow, space } from '../theme';
+import { noWebOutline, colors, fonts, motion, radius, shadow, space, themed } from '../theme';
 
 export function Screen({ children, style, edges = ['top', 'bottom'] }: {
   children: ReactNode;
@@ -120,7 +120,7 @@ export function ErrorText({ children }: { children: ReactNode }) {
   return <Text accessibilityRole="alert" style={styles.error}>{children}</Text>;
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   title: { fontFamily: fonts.heavy, fontSize: 34, lineHeight: 40, color: colors.ink, letterSpacing: -0.5 },
   body: { fontFamily: fonts.regular, fontSize: 16, lineHeight: 24, color: colors.ink },
@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
   },
   eyebrowText: { fontFamily: fonts.bold, fontSize: 11, letterSpacing: 1.6, textTransform: 'uppercase', color: colors.rose },
   button: { minHeight: 54, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', paddingHorizontal: space.lg },
-  buttonPrimary: { backgroundColor: colors.rose, ...shadow },
+  buttonPrimary: { backgroundColor: colors.roseFill, ...shadow },
   buttonGhost: { backgroundColor: 'transparent' },
   buttonText: { fontFamily: fonts.bold, fontSize: 16 },
   label: { fontFamily: fonts.medium, fontSize: 14, color: colors.inkMuted, marginLeft: 4 },
@@ -150,4 +150,4 @@ const styles = StyleSheet.create({
   },
   card: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: space.lg, ...shadow },
   error: { fontFamily: fonts.medium, fontSize: 14, color: colors.danger, marginLeft: 4 },
-});
+}));

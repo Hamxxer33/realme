@@ -10,7 +10,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, useAnimatedStyle, useSharedValue, withSequence, withSpring } from 'react-native-reanimated';
-import { noWebOutline, colors, fonts, motion, radius, shadow, space } from '../theme';
+import { noWebOutline, colors, fonts, motion, radius, shadow, space, themed } from '../theme';
 import { Icon } from './Icon';
 import { PressScale } from './ui';
 
@@ -145,7 +145,7 @@ export function Composer({ onSendText, onSendNudge, onSendImage, onSendVoice, on
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   bar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -181,12 +181,12 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: colors.rose,
+    backgroundColor: colors.roseFill,
     alignItems: 'center',
     justifyContent: 'center',
     ...shadow,
   },
   recordingShell: { alignItems: 'center', gap: space.sm, paddingRight: space.md },
-  recDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.rose },
+  recDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.roseFill },
   recText: { fontFamily: fonts.medium, fontSize: 15, color: colors.ink, fontVariant: ['tabular-nums'] },
-});
+}));

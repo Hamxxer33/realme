@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { PublicUser } from '../lib/api';
-import { colors, fonts, space } from '../theme';
+import { colors, fonts, space, themed } from '../theme';
 import { Avatar } from './Avatar';
 
 export function UserRow({ user, onPress, right, subtitle }: {
@@ -32,9 +32,9 @@ export function UserRow({ user, onPress, right, subtitle }: {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, minHeight: 64 },
   main: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: 10 },
   name: { fontFamily: fonts.bold, fontSize: 16, color: colors.ink },
   handle: { fontFamily: fonts.regular, fontSize: 14, color: colors.inkMuted, marginTop: 1 },
-});
+}));

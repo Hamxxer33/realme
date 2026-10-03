@@ -4,7 +4,7 @@ import { ConversationRow } from '../../components/ConversationRow';
 import { Icon } from '../../components/Icon';
 import { Screen } from '../../components/ui';
 import { refreshConversations, useConversations } from '../../lib/conversations';
-import { colors, fonts, radius, shadow, space } from '../../theme';
+import { colors, fonts, radius, shadow, space, themed } from '../../theme';
 
 export default function Chats() {
   const { chats, requests } = useConversations();
@@ -63,7 +63,7 @@ function HeaderButton({ icon, label, onPress }: { icon: 'users' | 'edit'; label:
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.sm },
   title: { flex: 1, fontFamily: fonts.heavy, fontSize: 32, color: colors.ink, letterSpacing: -0.5 },
   headerButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface, ...shadow, shadowOpacity: 0.05 },
@@ -75,12 +75,12 @@ const styles = StyleSheet.create({
   requests: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, paddingVertical: 12 },
   requestIcon: { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.roseTint, alignItems: 'center', justifyContent: 'center' },
   requestText: { flex: 1, fontFamily: fonts.bold, fontSize: 16, color: colors.ink },
-  badge: { minWidth: 24, height: 24, borderRadius: 12, paddingHorizontal: 7, backgroundColor: colors.rose, alignItems: 'center', justifyContent: 'center' },
+  badge: { minWidth: 24, height: 24, borderRadius: 12, paddingHorizontal: 7, backgroundColor: colors.roseFill, alignItems: 'center', justifyContent: 'center' },
   badgeText: { fontFamily: fonts.bold, fontSize: 13, color: colors.onRose },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space.xl, gap: space.sm },
   emptyMark: { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.roseTint, alignItems: 'center', justifyContent: 'center', marginBottom: space.sm },
   emptyTitle: { fontFamily: fonts.heavy, fontSize: 22, color: colors.ink },
   emptyBody: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, color: colors.inkMuted, textAlign: 'center' },
-  emptyButton: { marginTop: space.md, backgroundColor: colors.rose, borderRadius: radius.pill, paddingHorizontal: space.lg, paddingVertical: 13 },
+  emptyButton: { marginTop: space.md, backgroundColor: colors.roseFill, borderRadius: radius.pill, paddingHorizontal: space.lg, paddingVertical: 13 },
   emptyButtonText: { fontFamily: fonts.bold, color: colors.onRose, fontSize: 15 },
-});
+}));

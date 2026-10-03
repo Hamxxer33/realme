@@ -8,7 +8,7 @@ import { Screen } from '../../components/ui';
 import { postMenu } from '../../lib/postActions';
 import { useSession } from '../../lib/session';
 import { useFeed } from '../../lib/useFeed';
-import { colors, fonts, shadow, space } from '../../theme';
+import { colors, fonts, shadow, space, themed } from '../../theme';
 
 export default function Timeline() {
   const { me } = useSession();
@@ -67,15 +67,15 @@ export default function Timeline() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   header: { paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.md },
   title: { fontFamily: fonts.heavy, fontSize: 32, color: colors.ink, letterSpacing: -0.5 },
   fab: {
     position: 'absolute', right: space.lg, bottom: space.lg, width: 60, height: 60, borderRadius: 30,
-    backgroundColor: colors.rose, alignItems: 'center', justifyContent: 'center', ...shadow, shadowOpacity: 0.2,
+    backgroundColor: colors.roseFill, alignItems: 'center', justifyContent: 'center', ...shadow, shadowOpacity: 0.2,
   },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space.xl, gap: space.sm },
   emptyTitle: { fontFamily: fonts.heavy, fontSize: 22, color: colors.ink },
   emptyBody: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, color: colors.inkMuted, textAlign: 'center' },
-});
+}));
 

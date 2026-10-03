@@ -384,6 +384,30 @@ describe('per-chat settings', () => {
   });
 });
 
+describe('privacy', () => {
+  it('read receipts are mutual: turning them off hides both directions', async () => {
+    const [ana, ben] = [await ctx.signup('ana'), await ctx.signup('ben')];
+    const conv = await ctx.direct(ana, ben);
+    const msg = (await ctx.send(ana, conv, { kind: 'text', text: 'hi' })).body.message;
+    await ctx.call('POST', `/conversations/${conv}/read`, { as: ben, body: { upTo: msg.id } });
+    const benAsSeenByAna = () => ctx.call('GET', `/conversations/${conv}`, { as: ana })
+      .then((r) => r.body.conversation.members.find((m: { id: string }) => m.id === ben.id).lastReadAt);
+    expect(await benAsSeenByAna()).not.toBeNull();
+
+    expect((await ctx.call('PATCH', '/me', { as: ben, body: { readReceipts: false } })).body.user.readReceipts).toBe(false);
+    expect(await benAsSeenByAna()).toBeNull();
+    // …and Ben no longer sees Ana's either.
+    await ctx.call('POST', `/conversations/${conv}/read`, { as: ana, body: { upTo: msg.id } });
+    const anaAsSeenByBen = (await ctx.call('GET', `/conversations/${conv}`, { as: ben })).body.conversation.members
+      .find((m: { id: string }) => m.id === ana.id).lastReadAt;
+    expect(anaAsSeenByBen).toBeNull();
+    // Ben still sees his own read position (for unread counts).
+    const own = (await ctx.call('GET', `/conversations/${conv}`, { as: ben })).body.conversation.members
+      .find((m: { id: string }) => m.id === ben.id).lastReadAt;
+    expect(own).not.toBeNull();
+  });
+});
+
 describe('blocking and reporting', () => {
   it('blocking stops chats, search, profiles, group adds and posts — both ways', async () => {
     const [ana, ben, cat] = [await ctx.signup('ana'), await ctx.signup('ben'), await ctx.signup('cat')];

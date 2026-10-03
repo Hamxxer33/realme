@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ConversationView } from '../lib/api';
 import { conversationTitle, otherMembers, shortTime } from '../lib/format';
 import { useSession } from '../lib/session';
-import { colors, fonts, space } from '../theme';
+import { colors, fonts, space, themed } from '../theme';
 import { Avatar, GroupAvatar } from './Avatar';
 
 function preview(body: MessageBody | null, mine: boolean, sender: string | null) {
@@ -72,12 +72,12 @@ export const ConversationRow = memo(function ConversationRow({ conv, onPress }: 
   );
 });
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, paddingVertical: 10 },
   top: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   title: { flex: 1, fontFamily: fonts.bold, fontSize: 16, color: colors.ink },
   time: { fontFamily: fonts.medium, fontSize: 12, color: colors.inkMuted },
   preview: { flex: 1, fontFamily: fonts.regular, fontSize: 14, color: colors.inkMuted },
-  badge: { minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 6, backgroundColor: colors.rose, alignItems: 'center', justifyContent: 'center' },
+  badge: { minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 6, backgroundColor: colors.roseFill, alignItems: 'center', justifyContent: 'center' },
   badgeText: { fontFamily: fonts.bold, fontSize: 12, color: colors.onRose },
-});
+}));

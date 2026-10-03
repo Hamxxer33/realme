@@ -1,112 +1,70 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { Avatar } from '../../components/Avatar';
-import { Icon, type IconName } from '../../components/Icon';
-import { Button, Card, ErrorText, Field, Screen } from '../../components/ui';
-import { api, type Me } from '../../lib/api';
-import { confirm, notify } from '../../lib/confirm';
+import { Icon } from '../../components/Icon';
+import { Row, Section } from '../../components/SettingsList';
+import { Screen } from '../../components/ui';
+import { useAppearance } from '../../lib/appearance';
 import { useSession } from '../../lib/session';
-import { colors, fonts, space } from '../../theme';
+import { colors, fonts, space, themed } from '../../theme';
 
-export default function Profile() {
-  const { me, setMe, signOut } = useSession();
-  const [editing, setEditing] = useState(false);
-  const [displayName, setDisplayName] = useState(me?.displayName ?? '');
-  const [bio, setBio] = useState(me?.bio ?? '');
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+const APPEARANCE_LABEL = { system: 'Match phone', light: 'Light', dark: 'Dark' } as const;
+
+/** "You" tab: profile header plus settings, WhatsApp-style. */
+export default function Settings() {
+  const { me } = useSession();
+  const appearance = useAppearance();
   if (!me) return null;
 
-  const save = async () => {
-    setError(null);
-    if (!displayName.trim()) return setError('Your name can’t be empty.');
-    setSaving(true);
-    try {
-      const { user } = await api<{ user: Me }>('PATCH', '/me', { displayName: displayName.trim(), bio: bio.trim() });
-      setMe(user);
-      setEditing(false);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const deleteAccount = async () => {
-    const ok = await confirm('Delete your account?', 'Your profile, posts and messages will be permanently deleted.', 'Delete');
-    if (!ok) return;
-    try {
-      await api('DELETE', '/me');
-      await signOut();
-    } catch {
-      notify("Couldn't delete account", 'Please try again.');
-    }
-  };
+  const invite = () =>
+    void Share.share({ message: `Let's chat on Realme — it's private and end-to-end encrypted. Find me as @${me.username}` });
 
   return (
     <Screen edges={['top']}>
+      <View style={styles.header}>
+        <Text accessibilityRole="header" style={styles.title}>Settings</Text>
+      </View>
       <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.hero}>
-          <Avatar name={me.displayName} seed={me.username} size={88} />
-          <Text accessibilityRole="header" style={styles.name}>{me.displayName}</Text>
-          <Text style={styles.handle}>@{me.username}</Text>
-          {me.bio ? <Text style={styles.bio}>{me.bio}</Text> : null}
-        </View>
-
-        {editing ? (
-          <Card style={{ gap: space.md }}>
-            <Field label="Name" value={displayName} onChangeText={setDisplayName} maxLength={40} />
-            <Field label="Bio" value={bio} onChangeText={setBio} maxLength={160} multiline style={{ minHeight: 80, paddingTop: 14, textAlignVertical: 'top' }} />
-            <ErrorText>{error}</ErrorText>
-            <Button title="Save" onPress={save} loading={saving} />
-            <Button title="Cancel" variant="ghost" onPress={() => setEditing(false)} />
-          </Card>
-        ) : (
-          <Card style={styles.menu}>
-            <Row icon="edit" label="Edit profile" onPress={() => setEditing(true)} />
-            <Row icon="feed" label="My posts" onPress={() => router.push(`/user/${me.username}`)} />
-            <Row icon="block" label="Blocked people" onPress={() => router.push('/blocked')} />
-          </Card>
-        )}
-
-        <Card style={styles.menu}>
-          <View style={styles.lockRow}>
-            <Icon name="lock" size={18} color={colors.rose} />
-            <Text style={styles.lockText}>
-              Your chats are end-to-end encrypted. Your password unlocks your key, so if you forget it your messages can't be recovered.
-            </Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="Edit profile" onPress={() => router.push('/settings/edit-profile')} style={styles.profile}>
+          <Avatar name={me.displayName} seed={me.username} size={72} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.name} numberOfLines={1}>{me.displayName}</Text>
+            <Text style={styles.handle}>@{me.username}</Text>
+            {me.bio ? <Text style={styles.bio} numberOfLines={2}>{me.bio}</Text> : <Text style={styles.bioEmpty}>Add a bio</Text>}
           </View>
-        </Card>
+          <Icon name="edit" color={colors.inkMuted} size={22} />
+        </Pressable>
 
-        <View style={{ gap: space.xs }}>
-          <Button title="Sign out" variant="ghost" onPress={() => void signOut()} />
-          <Button title="Delete account" variant="ghost" onPress={deleteAccount} />
-        </View>
+        <Section>
+          <Row icon="key" title="Account" subtitle="Email, sign out, delete account" onPress={() => router.push('/settings/account')} chevron />
+          <Row icon="lock" title="Privacy" subtitle="Read receipts, blocked accounts" onPress={() => router.push('/settings/privacy')} chevron />
+          <Row icon="feed" title="My posts" subtitle="Your public timeline posts" onPress={() => router.push(`/user/${me.username}`)} chevron />
+        </Section>
+
+        <Section>
+          <Row icon="palette" title="Appearance" subtitle={APPEARANCE_LABEL[appearance]} onPress={() => router.push('/settings/appearance')} chevron />
+          <Row icon="bell" title="Notifications" subtitle="Message and group alerts" onPress={() => router.push('/settings/notifications')} chevron />
+        </Section>
+
+        <Section>
+          <Row icon="help" title="Help" subtitle="How encryption works, privacy, contact" onPress={() => router.push('/settings/help')} chevron />
+          <Row icon="users" title="Invite a friend" onPress={invite} />
+        </Section>
+
+        <Text style={styles.footer}>Realme · end-to-end encrypted</Text>
       </ScrollView>
     </Screen>
   );
 }
 
-function Row({ icon, label, onPress }: { icon: IconName; label: string; onPress: () => void }) {
-  return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.row, pressed && { opacity: 0.6 }]}>
-      <Icon name={icon} color={colors.ink} size={22} />
-      <Text style={styles.rowText}>{label}</Text>
-      <View style={{ transform: [{ rotate: '180deg' }] }}><Icon name="back" color={colors.inkMuted} size={18} /></View>
-    </Pressable>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: { padding: space.lg, gap: space.lg },
-  hero: { alignItems: 'center', gap: 4, paddingVertical: space.md },
-  name: { fontFamily: fonts.heavy, fontSize: 26, color: colors.ink, marginTop: space.sm },
-  handle: { fontFamily: fonts.medium, fontSize: 15, color: colors.inkMuted },
-  bio: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, color: colors.ink, textAlign: 'center', marginTop: space.sm },
-  menu: { paddingVertical: space.sm, paddingHorizontal: space.md },
-  row: { flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 52 },
-  rowText: { flex: 1, fontFamily: fonts.bold, fontSize: 16, color: colors.ink },
-  lockRow: { flexDirection: 'row', gap: space.md, paddingVertical: space.sm },
-  lockText: { flex: 1, fontFamily: fonts.regular, fontSize: 14, lineHeight: 20, color: colors.inkMuted },
-});
+const styles = themed(() => StyleSheet.create({
+  header: { paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.sm },
+  title: { fontFamily: fonts.heavy, fontSize: 32, color: colors.ink, letterSpacing: -0.5 },
+  container: { padding: space.md, gap: space.lg, paddingBottom: space.xxl },
+  profile: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, borderRadius: 28, backgroundColor: colors.surface },
+  name: { fontFamily: fonts.heavy, fontSize: 20, color: colors.ink },
+  handle: { fontFamily: fonts.medium, fontSize: 14, color: colors.inkMuted },
+  bio: { fontFamily: fonts.regular, fontSize: 14, color: colors.ink, marginTop: 4 },
+  bioEmpty: { fontFamily: fonts.medium, fontSize: 14, color: colors.rose, marginTop: 4 },
+  footer: { fontFamily: fonts.medium, fontSize: 13, color: colors.inkMuted, textAlign: 'center' },
+}));

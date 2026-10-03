@@ -1,5 +1,5 @@
 import { StyleSheet, TextInput, View } from 'react-native';
-import { noWebOutline, colors, fonts, radius, shadow, space } from '../theme';
+import { noWebOutline, colors, fonts, radius, shadow, space, themed } from '../theme';
 import { Icon } from './Icon';
 
 export function SearchField({ value, onChangeText, autoFocus }: { value: string; onChangeText: (t: string) => void; autoFocus?: boolean }) {
@@ -21,10 +21,10 @@ export function SearchField({ value, onChangeText, autoFocus }: { value: string;
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   box: {
     flexDirection: 'row', alignItems: 'center', gap: space.sm, marginHorizontal: space.lg, marginVertical: space.sm,
     paddingHorizontal: space.md, height: 48, borderRadius: radius.pill, backgroundColor: colors.surface, ...shadow, shadowOpacity: 0.05,
   },
   input: { ...noWebOutline, flex: 1, fontFamily: fonts.regular, fontSize: 16, color: colors.ink, height: '100%' },
-});
+}));

@@ -9,7 +9,7 @@ import { UserRow } from '../components/UserRow';
 import { api, type ConversationView, type PublicUser } from '../lib/api';
 import { upsert, useConversation } from '../lib/conversations';
 import { useUserSearch } from '../lib/useUserSearch';
-import { colors, fonts, radius, space } from '../theme';
+import { colors, fonts, radius, space, themed } from '../theme';
 
 /** Create a group, or (with ?add=<conversationId>) add people to an existing one. */
 export default function NewGroup() {
@@ -94,12 +94,12 @@ export default function NewGroup() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   chips: { gap: space.sm, paddingHorizontal: space.lg, paddingTop: space.md },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: colors.roseTint },
   chipText: { fontFamily: fonts.bold, fontSize: 14, color: colors.rose },
   check: { width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: colors.hairline, alignItems: 'center', justifyContent: 'center' },
-  checkOn: { backgroundColor: colors.rose, borderColor: colors.rose },
+  checkOn: { backgroundColor: colors.roseFill, borderColor: colors.rose },
   hint: { fontFamily: fonts.regular, fontSize: 15, color: colors.inkMuted, textAlign: 'center', padding: space.xl },
   footer: { padding: space.lg, gap: space.sm },
-});
+}));

@@ -13,7 +13,7 @@ import { upsert } from '../../lib/conversations';
 import { postMenu } from '../../lib/postActions';
 import { useSession } from '../../lib/session';
 import { useFeed } from '../../lib/useFeed';
-import { colors, fonts, radius, space } from '../../theme';
+import { colors, fonts, radius, space, themed } from '../../theme';
 
 interface Profile { user: PublicUser; blockedByMe: boolean; postCount: number; isMe: boolean }
 
@@ -117,7 +117,7 @@ export default function UserProfile() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   header: { alignItems: 'center', gap: 4, paddingVertical: space.lg },
   name: { fontFamily: fonts.heavy, fontSize: 26, color: colors.ink, marginTop: space.sm },
   handle: { fontFamily: fonts.medium, fontSize: 15, color: colors.inkMuted },
@@ -128,4 +128,4 @@ const styles = StyleSheet.create({
   unblock: { fontFamily: fonts.bold, fontSize: 15, color: colors.rose },
   missing: { fontFamily: fonts.regular, fontSize: 16, color: colors.inkMuted, textAlign: 'center', marginTop: space.xxl },
   noPosts: { fontFamily: fonts.regular, fontSize: 15, color: colors.inkMuted, textAlign: 'center', padding: space.xl },
-});
+}));

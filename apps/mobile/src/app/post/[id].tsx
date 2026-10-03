@@ -12,7 +12,7 @@ import { confirm, notify } from '../../lib/confirm';
 import { ago } from '../../lib/format';
 import { postMenu } from '../../lib/postActions';
 import { useSession } from '../../lib/session';
-import { noWebOutline, colors, fonts, radius, shadow, space } from '../../theme';
+import { noWebOutline, colors, fonts, radius, shadow, space, themed } from '../../theme';
 
 export default function PostScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -134,7 +134,7 @@ export default function PostScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   missing: { fontFamily: fonts.regular, fontSize: 16, color: colors.inkMuted, textAlign: 'center', marginTop: space.xxl },
   section: { fontFamily: fonts.bold, fontSize: 15, color: colors.inkMuted, marginTop: space.lg },
   comment: { flexDirection: 'row', gap: space.sm, alignItems: 'flex-start' },
@@ -145,5 +145,5 @@ const styles = StyleSheet.create({
   composer: { flexDirection: 'row', alignItems: 'flex-end', gap: space.sm, padding: space.md, backgroundColor: colors.bg },
   inputShell: { flex: 1, minHeight: 48, borderRadius: radius.lg, backgroundColor: colors.surface, paddingHorizontal: space.md, ...shadow, shadowOpacity: 0.06 },
   input: { ...noWebOutline, maxHeight: 120, paddingVertical: 13, fontFamily: fonts.regular, fontSize: 16, color: colors.ink },
-  send: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.rose, alignItems: 'center', justifyContent: 'center' },
-});
+  send: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.roseFill, alignItems: 'center', justifyContent: 'center' },
+}));

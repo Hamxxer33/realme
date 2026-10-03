@@ -9,7 +9,7 @@ import { api, type ConversationView, type PublicUser } from '../lib/api';
 import { notify } from '../lib/confirm';
 import { upsert } from '../lib/conversations';
 import { useUserSearch } from '../lib/useUserSearch';
-import { colors, fonts, space } from '../theme';
+import { colors, fonts, space, themed } from '../theme';
 
 export default function NewChat() {
   const [query, setQuery] = useState('');
@@ -53,7 +53,7 @@ export default function NewChat() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   empty: { padding: space.xl, alignItems: 'center' },
   emptyText: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, color: colors.inkMuted, textAlign: 'center' },
-});
+}));

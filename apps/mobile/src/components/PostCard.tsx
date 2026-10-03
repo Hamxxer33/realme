@@ -6,7 +6,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring } 
 import type { PostView } from '../lib/api';
 import { ago } from '../lib/format';
 import { publicUrlFor } from '../lib/media';
-import { colors, fonts, motion, radius, shadow, space } from '../theme';
+import { colors, fonts, motion, radius, shadow, space, themed } from '../theme';
 import { Avatar } from './Avatar';
 import { Icon } from './Icon';
 
@@ -94,7 +94,7 @@ export const PostCard = memo(function PostCard({ post, width, onLike, onMore, li
   );
 });
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   card: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: space.md, gap: space.sm, ...shadow, shadowOpacity: 0.05 },
   header: { flexDirection: 'row', alignItems: 'center' },
   author: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: space.sm },
@@ -106,4 +106,4 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', gap: space.lg, paddingTop: space.xs },
   action: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 32, minWidth: 44 },
   count: { fontFamily: fonts.medium, fontSize: 14, color: colors.inkMuted, minWidth: 8 },
-});
+}));

@@ -2,14 +2,19 @@
  * "Soft & romantic": warm cream canvas, rose accent, plum-brown ink.
  * All text/background pairs below meet WCAG AA (≥ 4.5:1).
  */
-export const colors = {
+export type Scheme = 'light' | 'dark';
+
+const light = {
   bg: '#FFF8F5',
   surface: '#FFFFFF',
   surfaceMuted: '#FBEDEA',
   hairline: 'rgba(46, 30, 36, 0.08)',
   ink: '#2E1E24',
   inkMuted: '#7A5F67',
+  /** Accent for text and icons. */
   rose: '#C2385E',
+  /** Accent for filled surfaces (buttons, my bubbles) that carry `onRose` text. */
+  roseFill: '#C2385E',
   roseSoft: '#F7D6DE',
   roseTint: '#FDEEF1',
   onRose: '#FFFFFF',
@@ -17,7 +22,58 @@ export const colors = {
   gold: '#8A6238',
   goldTint: '#FFF3E6',
   danger: '#B3261E',
-} as const;
+  scrim: 'rgba(46,30,36,0.3)',
+};
+
+/** Deep plum night palette. Every text/background pair is AA in this mode too. */
+const dark: typeof light = {
+  bg: '#151016',
+  surface: '#211A23',
+  surfaceMuted: '#2B232E',
+  hairline: 'rgba(255, 255, 255, 0.08)',
+  ink: '#F6EDF1',
+  inkMuted: '#BBA9B1',
+  rose: '#FF8FB0',
+  roseFill: '#B8325A',
+  roseSoft: '#5A2A3A',
+  roseTint: '#3A2230',
+  onRose: '#FFFFFF',
+  onRoseMuted: '#FFE6EE',
+  gold: '#E8BC85',
+  goldTint: '#2F2519',
+  danger: '#FF8A80',
+  scrim: 'rgba(0,0,0,0.55)',
+};
+
+let current: Scheme = 'light';
+
+/** Set before rendering; the root remounts the tree when it changes. */
+export function setScheme(scheme: Scheme) {
+  current = scheme;
+}
+
+export function currentScheme(): Scheme {
+  return current;
+}
+
+/** Always reads the active palette, so `colors.ink` is right in both modes. */
+export const colors: typeof light = new Proxy({} as typeof light, {
+  get: (_, key: string) => (current === 'dark' ? dark : light)[key as keyof typeof light],
+});
+
+/**
+ * Wrap a StyleSheet so it is built once per scheme and always read for the
+ * active one: `const styles = themed(() => StyleSheet.create({ ... }))`.
+ */
+export function themed<T extends object>(make: () => T): T {
+  const cache: Partial<Record<Scheme, T>> = {};
+  return new Proxy({} as T, {
+    get: (_, key) => {
+      const sheet = (cache[current] ??= make());
+      return sheet[key as keyof T];
+    },
+  });
+}
 
 export const fonts = {
   regular: 'Nunito_400Regular',

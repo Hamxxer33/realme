@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { api, type ReportReason } from '../lib/api';
 import { notify } from '../lib/confirm';
-import { colors, fonts, radius, space } from '../theme';
+import { colors, fonts, radius, space, themed } from '../theme';
 import { Body, Button, Field } from './ui';
 
 const REASONS: Array<{ id: ReportReason; label: string }> = [
@@ -82,8 +82,8 @@ export function ReportSheet({ target, onClose }: { target: ReportTarget | null; 
   );
 }
 
-const styles = StyleSheet.create({
-  scrim: { flex: 1, backgroundColor: 'rgba(46,30,36,0.3)' },
+const styles = themed(() => StyleSheet.create({
+  scrim: { flex: 1, backgroundColor: colors.scrim },
   sheet: {
     maxHeight: '85%',
     backgroundColor: colors.bg,
@@ -97,5 +97,5 @@ const styles = StyleSheet.create({
   optionOn: { backgroundColor: colors.roseTint },
   optionText: { fontFamily: fonts.medium, fontSize: 15, color: colors.ink },
   radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: colors.inkMuted },
-  radioOn: { borderColor: colors.rose, backgroundColor: colors.rose },
-});
+  radioOn: { borderColor: colors.rose, backgroundColor: colors.roseFill },
+}));

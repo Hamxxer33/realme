@@ -24,7 +24,7 @@ export function registerAccounts(app: App, ctx: Ctx) {
     return sign({ sub: userId, iat, exp: iat + TOKEN_TTL_SECONDS }, ctx.jwtSecret, 'HS256');
   };
 
-  const me = (u: typeof users.$inferSelect) => ({ ...publicUser(u), email: u.email });
+  const me = (u: typeof users.$inferSelect) => ({ ...publicUser(u), email: u.email, readReceipts: u.readReceipts });
 
   app.get('/auth/username-available', zValidator('query', z.object({ username })), async (c) => {
     const { username: name } = c.req.valid('query');
@@ -85,6 +85,7 @@ export function registerAccounts(app: App, ctx: Ctx) {
   app.patch('/me', auth, zValidator('json', z.object({
     displayName: z.string().trim().min(1).max(40).optional(),
     bio: z.string().trim().max(160).optional(),
+    readReceipts: z.boolean().optional(),
   })), async (c) => {
     const [user] = await db.update(users).set(c.req.valid('json')).where(eq(users.id, c.var.user.id)).returning();
     return c.json({ user: me(user!) });

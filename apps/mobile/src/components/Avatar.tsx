@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, fonts } from '../theme';
+import { colors, fonts, themed } from '../theme';
 import { Icon } from './Icon';
 
 // Soft, warm tints that all keep the plum-brown initials readable (AA at these sizes).
@@ -37,7 +37,8 @@ export function GroupAvatar({ size = 44 }: { size?: number }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   circle: { alignItems: 'center', justifyContent: 'center' },
-  text: { fontFamily: fonts.bold, color: colors.ink },
-});
+  // Pastel circles in both themes, so initials stay dark ink.
+  text: { fontFamily: fonts.bold, color: '#2E1E24' },
+}));

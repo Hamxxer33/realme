@@ -5,7 +5,7 @@ import { ConversationRow } from '../components/ConversationRow';
 import { Icon } from '../components/Icon';
 import { Screen } from '../components/ui';
 import { useConversations } from '../lib/conversations';
-import { colors, fonts, space } from '../theme';
+import { colors, fonts, space, themed } from '../theme';
 
 export default function Requests() {
   const { requests } = useConversations();
@@ -26,8 +26,8 @@ export default function Requests() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   note: { flexDirection: 'row', gap: space.sm, paddingHorizontal: space.lg, paddingBottom: space.md },
   noteText: { flex: 1, fontFamily: fonts.regular, fontSize: 14, lineHeight: 20, color: colors.inkMuted },
   empty: { fontFamily: fonts.regular, fontSize: 15, color: colors.inkMuted, textAlign: 'center', padding: space.xl },
-});
+}));
