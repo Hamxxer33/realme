@@ -1,6 +1,7 @@
 import { PGlite } from '@electric-sql/pglite';
 import { serve, type ServerType } from '@hono/node-server';
 import { createCrypto, type KeyPair, type MessageBody, type Sodium } from '@realme/crypto';
+import { sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/pglite';
 import { migrate } from 'drizzle-orm/pglite/migrator';
 import sodiumLib from 'libsodium-wrappers-sumo';
@@ -248,6 +249,35 @@ describe('messages', () => {
     const rows = await ctx.db.select().from(schema.messages);
     expect(rows.find((r) => r.id === fromAlice.id)!.readAt).not.toBeNull();
     expect(rows.find((r) => r.id === fromBob.id)!.readAt).toBeNull();
+  });
+
+  it('marks the anchor message itself read (timestamps keep sub-millisecond precision)', async () => {
+    const { alice, bob, coupleId } = await ctx.pair();
+    // Insert rows with microsecond timestamps, as Postgres' now() produces in production.
+    const fromAlice = (await sendText(ctx.call, alice, bob, coupleId, 'a')).body.message;
+    await ctx.db.execute(sql`update messages set created_at = '2026-02-14T12:00:00.123456Z' where id = ${fromAlice.id}`);
+    await ctx.call('POST', '/messages/read', { token: bob.token, body: { upTo: fromAlice.id } });
+    const [row] = await ctx.db.select().from(schema.messages);
+    expect(row!.readAt).not.toBeNull();
+  });
+
+  it('never skips messages created within the same millisecond when paging', async () => {
+    const { alice, bob, coupleId } = await ctx.pair();
+    const ids: string[] = [];
+    for (let i = 0; i < 4; i++) ids.push((await sendText(ctx.call, alice, bob, coupleId, `m${i}`)).body.message.id);
+    // All four within one millisecond, differing only in microseconds.
+    for (let i = 0; i < 4; i++) {
+      await ctx.db.execute(sql`update messages set created_at = ${`2026-02-14T12:00:00.123${400 + i * 100}Z`}::timestamptz where id = ${ids[i]}`);
+    }
+    const seen: string[] = [];
+    let before: string | undefined;
+    for (let page = 0; page < 5; page++) {
+      const res = (await ctx.call('GET', `/messages?limit=1${before ? `&before=${before}` : ''}`, { token: bob.token })).body;
+      seen.push(...res.messages.map((m: { id: string }) => m.id));
+      if (!res.hasMore) break;
+      before = res.messages[0].id;
+    }
+    expect(seen).toEqual([...ids].reverse());
   });
 
   it('pushes a content-free notification when the partner is offline', async () => {

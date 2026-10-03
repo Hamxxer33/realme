@@ -1,0 +1,54 @@
+{
+  "expo": {
+    "name": "Realme",
+    "slug": "realme",
+    "scheme": "realme",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#FFF8F5",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.realme.app",
+      "config": { "usesNonExemptEncryption": false }
+    },
+    "android": {
+      "package": "com.realme.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#FDEEF1",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      "expo-router",
+      "expo-dev-client",
+      "expo-secure-store",
+      "react-native-libsodium",
+      [
+        "expo-splash-screen",
+        { "image": "./assets/splash-icon.png", "imageWidth": 120, "backgroundColor": "#FFF8F5" }
+      ],
+      [
+        "expo-audio",
+        { "microphonePermission": "Allow Realme to use your microphone so you can send voice notes." }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Realme to access your photos so you can share them with your partner.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-notifications",
+        { "color": "#C2385E" }
+      ]
+    ],
+    "experiments": { "typedRoutes": true }
+  }
+}

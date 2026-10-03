@@ -119,6 +119,13 @@ describe('password-derived secrets', () => {
   });
 });
 
+describe('setup', () => {
+  it('refuses a libsodium build that lacks required primitives', () => {
+    const partial = { ...sodium, crypto_pwhash_SALTBYTES: undefined } as unknown as Sodium;
+    expect(() => createCrypto(partial)).toThrow('crypto_pwhash_SALTBYTES');
+  });
+});
+
 describe('safety number', () => {
   it('matches on both phones and changes if a key is swapped', () => {
     const alice = c.generateKeyPair();

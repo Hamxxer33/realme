@@ -8,3 +8,4 @@ dist/
 ios/
 android/
 web-build/
+.media/

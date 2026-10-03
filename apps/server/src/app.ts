@@ -2,7 +2,7 @@ import { randomInt, randomUUID } from 'node:crypto';
 import { hash as argonHash, verify as argonVerify } from '@node-rs/argon2';
 import { createNodeWebSocket } from '@hono/node-ws';
 import { zValidator } from '@hono/zod-validator';
-import { and, desc, eq, gt, isNull, lt, lte, ne, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, lte, ne, sql } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { sign, verify } from 'hono/jwt';
@@ -20,6 +20,8 @@ export interface Deps {
   push: Push;
   jwtSecret: string;
   now?: () => Date;
+  /** Middleware to install ahead of every route (e.g. CORS). */
+  beforeRoutes?: (app: Hono<AppEnv>) => void;
 }
 
 type User = typeof users.$inferSelect;
@@ -44,6 +46,7 @@ export function createApp(deps: Deps) {
   const app = new Hono<AppEnv>();
   const { upgradeWebSocket, injectWebSocket } = createNodeWebSocket({ app });
   const limiter = rateLimiter(10, 15 * 60 * 1000, now);
+  deps.beforeRoutes?.(app);
 
   app.onError((err, c) => {
     if (err instanceof HTTPException) return c.json({ error: err.message }, err.status);
@@ -275,13 +278,12 @@ export function createApp(deps: Deps) {
       const { before, limit } = c.req.valid('query');
       let cursor = undefined;
       if (before) {
-        const [anchor] = await db.select({ createdAt: messages.createdAt, id: messages.id }).from(messages)
+        const [anchor] = await db.select({ id: messages.id }).from(messages)
           .where(and(eq(messages.id, before), eq(messages.coupleId, couple.id)));
         if (!anchor) throw new HTTPException(404, { message: 'Unknown cursor' });
-        cursor = or(
-          lt(messages.createdAt, anchor.createdAt),
-          and(eq(messages.createdAt, anchor.createdAt), lt(messages.id, anchor.id)),
-        );
+        // Compare inside Postgres: a JS Date would truncate microseconds and skip
+        // messages created within the same millisecond.
+        cursor = sql`(${messages.createdAt}, ${messages.id}) < (select created_at, id from messages where id = ${anchor.id})`;
       }
       const rows = await db.select().from(messages)
         .where(and(eq(messages.coupleId, couple.id), cursor))
@@ -317,7 +319,7 @@ export function createApp(deps: Deps) {
     const user = c.var.user;
     const { couple, partnerId } = await requirePaired(user);
     const { upTo } = c.req.valid('json');
-    const [anchor] = await db.select({ createdAt: messages.createdAt }).from(messages)
+    const [anchor] = await db.select({ id: messages.id }).from(messages)
       .where(and(eq(messages.id, upTo), eq(messages.coupleId, couple.id)));
     if (!anchor) throw new HTTPException(404, { message: 'Unknown message' });
     const readAt = now();
@@ -326,7 +328,8 @@ export function createApp(deps: Deps) {
         eq(messages.coupleId, couple.id),
         ne(messages.senderId, user.id),
         isNull(messages.readAt),
-        lte(messages.createdAt, anchor.createdAt),
+        // Same reason as paging: keep the anchor's full-precision timestamp in SQL.
+        lte(messages.createdAt, sql`(select created_at from messages where id = ${anchor.id})`),
       ));
     hub.send([user.id, partnerId], { type: 'read', readerId: user.id, readAt: readAt.toISOString(), upTo });
     return c.json({ ok: true });

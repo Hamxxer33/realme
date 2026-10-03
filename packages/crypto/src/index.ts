@@ -116,7 +116,26 @@ export interface PasswordCost {
   memLimit: number;
 }
 
+const REQUIRED: Array<keyof Sodium> = [
+  'crypto_box_NONCEBYTES',
+  'crypto_aead_xchacha20poly1305_ietf_NPUBBYTES',
+  'crypto_secretbox_NONCEBYTES',
+  'crypto_pwhash_SALTBYTES',
+  'crypto_pwhash_ALG_ARGON2ID13',
+  'crypto_pwhash_OPSLIMIT_INTERACTIVE',
+  'crypto_pwhash_MEMLIMIT_INTERACTIVE',
+  'crypto_box_easy',
+  'crypto_pwhash',
+  'crypto_kdf_derive_from_key',
+  'crypto_aead_xchacha20poly1305_ietf_encrypt',
+];
+
 export function createCrypto(sodium: Sodium) {
+  // Some libsodium builds (e.g. the non-"sumo" libsodium.js) omit primitives;
+  // fail loudly here rather than with a confusing error at first use.
+  const missing = REQUIRED.filter((name) => sodium[name] === undefined);
+  if (missing.length) throw new Error(`libsodium build is missing: ${missing.join(', ')}`);
+
   const b64 = (bytes: Uint8Array) => sodium.to_base64(bytes);
   const unb64 = (text: string) => sodium.from_base64(text);
 
