@@ -72,7 +72,7 @@ export default function Compose() {
           </Pressable>
           <Text style={styles.counter}>{text.length}/{MAX}</Text>
         </View>
-        <Text style={styles.note}>Posts are public: anyone on Realme can see them. Chats stay private.</Text>
+        <Text style={styles.note}>Posts are public: anyone on Lovenest can see them. Chats stay private.</Text>
         <ErrorText>{error}</ErrorText>
         <Button title="Share" onPress={share} loading={busy} disabled={!text.trim() && !photo} />
       </ScrollView>

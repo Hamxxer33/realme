@@ -21,6 +21,10 @@ export const users = pgTable('users', {
   pushToken: text('push_token'),
   // Privacy: when off, others don't see when I've read their messages — and I don't see theirs.
   readReceipts: boolean('read_receipts').notNull().default(true),
+  // When they agreed to the Terms (and confirmed they're 18+) at sign-up.
+  termsAcceptedAt: ts('terms_accepted_at'),
+  // Suspended by moderation: can't sign in, hidden from search.
+  bannedAt: ts('banned_at'),
   createdAt: ts('created_at').notNull().defaultNow(),
 }, (t) => [
   uniqueIndex('users_email_unique').on(sql`lower(${t.email})`),
@@ -157,6 +161,8 @@ export const reports = pgTable('reports', {
   details: text('details').notNull().default(''),
   createdAt: ts('created_at').notNull().defaultNow(),
   resolvedAt: ts('resolved_at'),
+  // What moderation did: 'dismissed', 'content_removed', 'user_banned'…
+  resolution: text('resolution'),
 });
 
 /** 24-hour status updates, encrypted like messages: one wrapped key per viewer. */

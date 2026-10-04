@@ -135,6 +135,13 @@ The app uses native modules (libsodium, secure storage), so it needs a
 use EAS: `npx eas-cli@latest build --profile development`. Push notifications
 need an EAS project id (`npx eas-cli@latest init`).
 
+### Publishing on Google Play
+
+Store listing text, data-safety answers, content rating, graphics and the release
+checklist are in [`docs/play-store/`](docs/play-store/README.md). Public pages the
+store requires are served by the API: `/privacy`, `/terms`, `/child-safety`,
+`/delete-account`. Moderating reports: [`docs/moderation.md`](docs/moderation.md).
+
 ### Deploying the server (Railway)
 
 `railway.json` builds `apps/server/Dockerfile` (server dependencies only) and

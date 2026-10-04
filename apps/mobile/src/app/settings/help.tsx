@@ -2,7 +2,9 @@ import Constants from 'expo-constants';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BackHeader } from '../../components/BackHeader';
 import { Icon, type IconName } from '../../components/Icon';
+import { Row, Section } from '../../components/SettingsList';
 import { Screen } from '../../components/ui';
+import { LINKS, openLink } from '../../lib/links';
 import { colors, fonts, radius, space, themed } from '../../theme';
 
 const TOPICS: Array<{ icon: IconName; title: string; body: string }> = [
@@ -47,7 +49,13 @@ export default function Help() {
             </View>
           </View>
         ))}
-        <Text style={styles.version}>Realme {Constants.expoConfig?.version ?? ''}</Text>
+        <Section title="Legal & support">
+          <Row icon="help" title="Contact support" subtitle="hz3302m@gmail.com" onPress={() => openLink(LINKS.support)} chevron />
+          <Row icon="lock" title="Privacy Policy" onPress={() => openLink(LINKS.privacy)} chevron />
+          <Row icon="feed" title="Terms of Service" onPress={() => openLink(LINKS.terms)} chevron />
+          <Row icon="shield" title="Child Safety Standards" onPress={() => openLink(LINKS.childSafety)} chevron />
+        </Section>
+        <Text style={styles.version}>Lovenest {Constants.expoConfig?.version ?? ''}</Text>
       </ScrollView>
     </Screen>
   );

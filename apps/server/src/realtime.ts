@@ -28,6 +28,18 @@ export class Hub {
     if (set?.size === 0) this.sockets.delete(userId);
   }
 
+  /** Close every socket a user has open (e.g. when their account is suspended). */
+  disconnect(userId: string) {
+    for (const ws of this.sockets.get(userId) ?? []) {
+      try {
+        ws.close(4003, 'account suspended');
+      } catch {
+        // already closing
+      }
+    }
+    this.sockets.delete(userId);
+  }
+
   isOnline(userId: string) {
     return (this.sockets.get(userId)?.size ?? 0) > 0;
   }

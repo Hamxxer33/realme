@@ -9,11 +9,13 @@ import { members } from './db/schema';
 import type { Push } from './push';
 import { Hub } from './realtime';
 import { registerAccounts } from './routes/accounts';
+import { registerAdmin } from './routes/admin';
 import { type IceConfig, registerCalls } from './routes/calls';
 import { registerChannels } from './routes/channels';
 import { registerChats } from './routes/chats';
 import { registerCommunities } from './routes/communities';
 import { registerMedia } from './routes/media';
+import { DEFAULT_SITE, type SiteInfo, registerPages } from './routes/pages';
 import { registerSafety } from './routes/safety';
 import { registerStatus } from './routes/status';
 import { registerTimeline } from './routes/timeline';
@@ -25,6 +27,10 @@ export interface Deps {
   push: Push;
   jwtSecret: string;
   now?: () => Date;
+  /** Enables the moderation API (`/admin/*`) when set. */
+  adminToken?: string;
+  /** App name and contact email shown on the public pages (privacy, terms…). */
+  site?: SiteInfo;
   /** STUN/TURN servers handed to phones for calls. */
   ice?: IceConfig;
   /** Middleware to install ahead of every route (e.g. CORS). */
@@ -56,6 +62,8 @@ export function createApp(deps: Deps) {
   const status = registerStatus(app, ctx);
   registerMedia(app, ctx, status);
   const callSignals = registerCalls(app, ctx, deps.ice);
+  registerAdmin(app, ctx, deps.adminToken);
+  registerPages(app, deps.site ?? DEFAULT_SITE);
 
   // The token is sent as the first frame rather than in the URL so it never lands in access logs.
   app.get('/ws', upgradeWebSocket(() => {
