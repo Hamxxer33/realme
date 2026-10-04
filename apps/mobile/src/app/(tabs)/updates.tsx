@@ -111,7 +111,7 @@ export default function Updates() {
           }}
           refreshing={feed.refreshing}
           contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: 120 }}
-          ListEmptyComponent={<Text style={styles.hint}>No posts yet — share a moment everyone on Realme can see.</Text>}
+          ListEmptyComponent={<Text style={styles.hint}>No posts yet — share a moment everyone on Lovenest can see.</Text>}
         />
       )}
       <View style={styles.fabs}>

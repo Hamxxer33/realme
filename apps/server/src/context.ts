@@ -41,7 +41,8 @@ export async function userFromToken(ctx: Ctx, token: string): Promise<User | nul
     if (typeof payload.sub !== 'string' || typeof payload.exp !== 'number') return null;
     if (payload.exp * 1000 <= ctx.now().getTime()) return null;
     const [user] = await ctx.db.select().from(users).where(eq(users.id, payload.sub));
-    return user ?? null;
+    // Suspended accounts are signed out everywhere.
+    return user && !user.bannedAt ? user : null;
   } catch {
     return null;
   }

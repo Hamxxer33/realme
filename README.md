@@ -111,15 +111,36 @@ on disk. Development only.
 
 ```bash
 # App
-cp apps/mobile/.env.example apps/mobile/.env    # EXPO_PUBLIC_API_URL
 cd apps/mobile
 npx expo run:ios      # or run:android
 ```
+
+The app talks to the live server (`https://server-production-403b.up.railway.app`)
+by default; set `EXPO_PUBLIC_API_URL` in `apps/mobile/.env` to use a local one.
+
+**Building with EAS** (no Xcode/Android Studio needed):
+
+```bash
+cd apps/mobile
+npx eas-cli@latest login
+npx eas-cli@latest init                                   # links the Expo project (once)
+npx eas-cli@latest build --profile development --platform android   # installable APK
+```
+
+Profiles in `eas.json`: `development` (dev client, APK), `preview` (standalone
+APK for testers), `production` (store build). All point at the live server.
 
 The app uses native modules (libsodium, secure storage), so it needs a
 **development build** — it won't run in Expo Go. Without Xcode/Android Studio,
 use EAS: `npx eas-cli@latest build --profile development`. Push notifications
 need an EAS project id (`npx eas-cli@latest init`).
+
+### Publishing on Google Play
+
+Store listing text, data-safety answers, content rating, graphics and the release
+checklist are in [`docs/play-store/`](docs/play-store/README.md). Public pages the
+store requires are served by the API: `/privacy`, `/terms`, `/child-safety`,
+`/delete-account`. Moderating reports: [`docs/moderation.md`](docs/moderation.md).
 
 ### Deploying the server (Railway)
 

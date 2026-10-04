@@ -92,6 +92,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       authSecret,
       publicKey: keys.publicKey,
       keyBackup: c.wrapSecretKey(keys.secretKey, backupKey),
+      acceptTerms: true, // the sign-up screen requires the box to be ticked
     });
     await start(res.token, keys.secretKey);
   }, [start]);

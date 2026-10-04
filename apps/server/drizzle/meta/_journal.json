@@ -50,6 +50,13 @@
       "when": 1791055640056,
       "tag": "0006_calls",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791122437176,
+      "tag": "0007_moderation",
+      "breakpoints": true
     }
   ]
 }

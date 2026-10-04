@@ -46,7 +46,7 @@ export default function Privacy() {
         </Section>
         <Text style={styles.note}>
           Your chats, photos, voice notes and status updates are end-to-end encrypted. Your profile name, @username, bio and timeline
-          posts are visible to everyone on Realme.
+          posts are visible to everyone on Lovenest.
         </Text>
       </ScrollView>
     </Screen>

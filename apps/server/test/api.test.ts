@@ -14,6 +14,7 @@ import * as schema from '../src/db/schema';
 import type { Storage } from '../src/storage';
 
 const crypto_uuid = () => globalThis.crypto.randomUUID();
+const ADMIN_TOKEN = 'admin-'.repeat(8);
 const FAST = { opsLimit: 1, memLimit: 8192 * 4 };
 let crypto: ReturnType<typeof createCrypto>;
 
@@ -54,6 +55,7 @@ async function setup() {
     storage,
     push: { send: async (to, title, body) => void pushes.push({ to, title, body }) },
     jwtSecret: 'x'.repeat(48),
+    adminToken: ADMIN_TOKEN,
     now: () => clock,
   });
 
@@ -72,7 +74,7 @@ async function setup() {
     const keys = crypto.generateKeyPair();
     const { authSecret, backupKey } = crypto.derivePasswordSecrets(email, password, FAST);
     const res = await call('POST', '/auth/signup', {
-      body: { email, username, displayName: username[0]!.toUpperCase() + username.slice(1), authSecret, publicKey: keys.publicKey, keyBackup: crypto.wrapSecretKey(keys.secretKey, backupKey) },
+      body: { email, username, displayName: username[0]!.toUpperCase() + username.slice(1), authSecret, publicKey: keys.publicKey, keyBackup: crypto.wrapSecretKey(keys.secretKey, backupKey), acceptTerms: true },
     });
     expect(res.status).toBe(201);
     return { token: res.body.token, id: res.body.user.id, username, keys };
@@ -107,7 +109,7 @@ async function setup() {
   }
 
   return {
-    db, call, signup, send, open, direct, listen, deletedPrefixes, pushes,
+    app, db, call, signup, send, open, direct, listen, deletedPrefixes, pushes,
     advance: (ms: number) => (clock = new Date(clock.getTime() + ms)),
     close: async () => {
       await new Promise((r) => (server ? server.close(r) : r(null)));
@@ -132,7 +134,7 @@ describe('accounts', () => {
 
   it('rejects taken usernames/emails and invalid usernames', async () => {
     await ctx.signup('ana');
-    const base = { displayName: 'X', authSecret: 'abc', publicKey: 'abc', keyBackup: { nonce: 'a', ciphertext: 'b' } };
+    const base = { displayName: 'X', authSecret: 'abc', publicKey: 'abc', keyBackup: { nonce: 'a', ciphertext: 'b' }, acceptTerms: true };
     expect((await ctx.call('POST', '/auth/signup', { body: { ...base, email: 'other@example.com', username: 'Ana' } })).body.error).toMatch(/username/);
     expect((await ctx.call('POST', '/auth/signup', { body: { ...base, email: 'ana@example.com', username: 'ana2' } })).body.error).toMatch(/email/);
     expect((await ctx.call('POST', '/auth/signup', { body: { ...base, email: 'x@example.com', username: 'no spaces' } })).status).toBe(400);
@@ -628,6 +630,81 @@ describe('communities', () => {
     await ctx.call('DELETE', `/conversations/${community.announcementsId}/membership`, { as: ana });
     expect(await ctx.db.select().from(schema.communities)).toEqual([]);
     expect((await ctx.call('GET', `/conversations/${group.id}`, { as: ana })).body.conversation.community).toBeNull();
+  });
+});
+
+describe('store requirements', () => {
+  it('sign-up needs the Terms accepted (18+); the time is recorded', async () => {
+    const keys = crypto.generateKeyPair();
+    const body = { email: 'kid@example.com', username: 'kid', displayName: 'Kid', authSecret: 'abc', publicKey: keys.publicKey, keyBackup: { nonce: 'a', ciphertext: 'b' } };
+    expect((await ctx.call('POST', '/auth/signup', { body })).status).toBe(400);
+    expect((await ctx.call('POST', '/auth/signup', { body: { ...body, acceptTerms: false } })).status).toBe(400);
+    const ana = await ctx.signup('ana');
+    const [row] = await ctx.db.select().from(schema.users).where(sql`id = ${ana.id}`);
+    expect(row!.termsAcceptedAt).toBeInstanceOf(Date);
+  });
+
+  it('serves the privacy policy, terms, child-safety standards and account deletion pages', async () => {
+    const { app } = ctx;
+    for (const [path, needle] of [['/privacy', 'end-to-end encrypted'], ['/terms', '18 years old'], ['/child-safety', 'zero tolerance'], ['/delete-account', 'You → Account → Delete account']] as const) {
+      const res = await app.request(path);
+      expect(res.status).toBe(200);
+      const html = await res.text();
+      expect(html).toContain('Lovenest');
+      expect(html).toContain('hz3302m@gmail.com');
+      expect(html).toContain(needle);
+    }
+    for (const file of ['derive.mjs', 'delete-account.mjs', 'sodium/libsodium-wrappers.mjs', 'sodium/libsodium-sumo.mjs']) {
+      const res = await app.request(`/static/${file}`);
+      expect(res.status).toBe(200);
+      expect(res.headers.get('content-type')).toContain('javascript');
+    }
+    expect((await app.request('/static/../package.json')).status).toBe(404);
+  });
+
+  it('the web deletion page derives the same login secret as the app, so it can delete the account', async () => {
+    const { deriveAuthSecret } = await import('../src/web/derive.mjs');
+    const email = 'Ana@Example.com';
+    expect(deriveAuthSecret(sodiumLib, email, 'a long password')).toBe(crypto.derivePasswordSecrets(email, 'a long password').authSecret);
+
+    // Sign up the way the app does, then log in + delete the way the page does.
+    const keys = crypto.generateKeyPair();
+    const { authSecret, backupKey } = crypto.derivePasswordSecrets('web@example.com', 'correct horse battery');
+    await ctx.call('POST', '/auth/signup', { body: { email: 'web@example.com', username: 'webby', displayName: 'Web', authSecret, publicKey: keys.publicKey, keyBackup: crypto.wrapSecretKey(keys.secretKey, backupKey), acceptTerms: true } });
+    const login = await ctx.call('POST', '/auth/login', { body: { email: 'web@example.com', authSecret: deriveAuthSecret(sodiumLib, 'web@example.com', 'correct horse battery') } });
+    expect(login.status).toBe(200);
+    expect((await ctx.call('DELETE', '/me', { as: login.body.token })).status).toBe(200);
+    expect(await ctx.db.select().from(schema.users).where(sql`email = 'web@example.com'`)).toEqual([]);
+  }, 30_000);
+
+  it('moderation: reports queue, remove content, suspend and reinstate accounts', async () => {
+    const [ana, ben] = [await ctx.signup('ana'), await ctx.signup('ben')];
+    const admin = (method: string, path: string, body?: unknown) => ctx.call(method, path, { as: ADMIN_TOKEN, body });
+    // Without the token the API doesn't exist.
+    expect((await ctx.call('GET', '/admin/reports', { as: ana })).status).toBe(404);
+
+    const post = (await ctx.call('POST', '/posts', { as: ben, body: { text: 'spam spam spam' } })).body.post;
+    await ctx.call('POST', '/reports', { as: ana, body: { reason: 'spam', postId: post.id, userId: ben.id, details: 'keeps posting this' } });
+    const queue = (await admin('GET', '/admin/reports')).body.reports;
+    expect(queue).toHaveLength(1);
+    expect(queue[0]).toMatchObject({ reason: 'spam', reporter: { username: 'ana' }, targetUser: { username: 'ben' }, post: { text: 'spam spam spam' } });
+
+    expect((await admin('DELETE', `/admin/posts/${post.id}`)).status).toBe(200);
+    expect((await admin('POST', `/admin/users/${ben.id}/ban`)).status).toBe(200);
+    expect((await admin('POST', `/admin/reports/${queue[0].id}/resolve`, { resolution: 'user_banned' })).status).toBe(200);
+    expect((await admin('GET', '/admin/reports')).body.reports).toEqual([]);
+
+    // Suspended: signed out, can't sign in, invisible to others.
+    expect((await ctx.call('GET', '/me', { as: ben })).status).toBe(401);
+    const { authSecret } = crypto.derivePasswordSecrets('ben@example.com', 'a long password', { opsLimit: 1, memLimit: 8192 * 4 });
+    const login = await ctx.call('POST', '/auth/login', { body: { email: 'ben@example.com', authSecret } });
+    expect(login.status).toBe(403);
+    expect(login.body.error).toMatch(/suspended/);
+    expect((await ctx.call('GET', '/users/search?q=ben', { as: ana })).body.users).toEqual([]);
+    expect((await ctx.call('GET', '/users/ben', { as: ana })).status).toBe(404);
+
+    expect((await admin('DELETE', `/admin/users/${ben.id}/ban`)).status).toBe(200);
+    expect((await ctx.call('POST', '/auth/login', { body: { email: 'ben@example.com', authSecret } })).status).toBe(200);
   });
 });
 

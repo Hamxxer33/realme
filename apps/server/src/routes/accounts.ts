@@ -1,6 +1,6 @@
 import { hash as argonHash, verify as argonVerify } from '@node-rs/argon2';
 import { zValidator } from '@hono/zod-validator';
-import { and, eq, ilike, ne, not, or, sql } from 'drizzle-orm';
+import { and, eq, ilike, isNull, ne, not, or, sql } from 'drizzle-orm';
 import { sign } from 'hono/jwt';
 import { z } from 'zod';
 import {
@@ -42,6 +42,8 @@ export function registerAccounts(app: App, ctx: Ctx) {
       authSecret: b64(128),
       publicKey: b64(64),
       keyBackup: sealed(),
+      // The sign-up screen asks people to confirm they're 18+ and agree to the Terms and Privacy Policy.
+      acceptTerms: z.literal(true, { error: 'Please agree to the Terms and confirm you are 18 or older' }),
     })),
     async (c) => {
       const body = c.req.valid('json');
@@ -57,6 +59,7 @@ export function registerAccounts(app: App, ctx: Ctx) {
         publicKey: body.publicKey,
         keyBackupNonce: body.keyBackup.nonce,
         keyBackupCiphertext: body.keyBackup.ciphertext,
+        termsAcceptedAt: ctx.now(),
       }).returning().catch((err) => {
         // Lost a race with a concurrent signup.
         if (isUniqueViolation(err)) fail(409, 'That username or email is already taken');
@@ -73,6 +76,7 @@ export function registerAccounts(app: App, ctx: Ctx) {
     rateLimit(ctx, `login-ip:${ip}`, 30, HOUR / 4);
     const [user] = await db.select().from(users).where(sql`lower(${users.email}) = ${addr}`);
     if (!user || !(await argonVerify(user.authHash, authSecret))) fail(401, 'Wrong email or password');
+    if (user.bannedAt) fail(403, 'This account has been suspended for breaking the Terms. Contact support if you think this is a mistake.');
     return c.json({
       token: await issueToken(user.id),
       user: me(user),
@@ -127,6 +131,7 @@ export function registerAccounts(app: App, ctx: Ctx) {
     const rows = await db.select().from(users)
       .where(and(
         ne(users.id, me.id),
+        isNull(users.bannedAt),
         or(ilike(users.username, `${q}%`), ilike(users.displayName, `%${q}%`)),
         not(blockRelation(users.id, me.id)),
       ))
@@ -145,7 +150,7 @@ export function registerAccounts(app: App, ctx: Ctx) {
 
   app.get('/users/:username', auth, zValidator('param', z.object({ username })), async (c) => {
     const me = c.var.user;
-    const [user] = await db.select().from(users).where(eq(users.username, c.req.valid('param').username));
+    const [user] = await db.select().from(users).where(and(eq(users.username, c.req.valid('param').username), isNull(users.bannedAt)));
     if (!user) fail(404, 'User not found');
     const [rel] = await db.select({
       blockedByMe: sql<boolean>`exists (select 1 from ${blocks} where ${blocks.blockerId} = ${me.id} and ${blocks.blockedId} = ${user.id})`,

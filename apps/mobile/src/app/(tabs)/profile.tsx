@@ -17,7 +17,7 @@ export default function Settings() {
   if (!me) return null;
 
   const invite = () =>
-    void Share.share({ message: `Let's chat on Realme — it's private and end-to-end encrypted. Find me as @${me.username}` });
+    void Share.share({ message: `Let's chat on Lovenest — it's private and end-to-end encrypted. Find me as @${me.username}` });
 
   return (
     <Screen edges={['top']}>
@@ -51,7 +51,7 @@ export default function Settings() {
           <Row icon="users" title="Invite a friend" onPress={invite} />
         </Section>
 
-        <Text style={styles.footer}>Realme · end-to-end encrypted</Text>
+        <Text style={styles.footer}>Lovenest · end-to-end encrypted</Text>
       </ScrollView>
     </Screen>
   );

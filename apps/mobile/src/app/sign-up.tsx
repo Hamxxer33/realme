@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Text } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { AuthForm } from '../components/AuthForm';
+import { Icon } from '../components/Icon';
 import { Body, Button, ErrorText, Field } from '../components/ui';
 import { api } from '../lib/api';
+import { LINKS, openLink } from '../lib/links';
 import { useSession } from '../lib/session';
 import { colors, fonts } from '../theme';
 
@@ -18,6 +20,7 @@ export default function SignUp() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [available, setAvailable] = useState<boolean | null>(null);
+  const [agreed, setAgreed] = useState(false);
 
   const handle = username.trim().toLowerCase().replace(/^@/, '');
 
@@ -43,6 +46,7 @@ export default function SignUp() {
     if (available === false) return setError('That username is taken.');
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) return setError('Enter a valid email address.');
     if (password.length < MIN_PASSWORD) return setError(`Use at least ${MIN_PASSWORD} characters for your password.`);
+    if (!agreed) return setError('Please confirm you are 18 or older and agree to the Terms and Privacy Policy.');
     setBusy(true);
     try {
       await signUp({ email: email.trim(), password, username: handle, displayName: displayName.trim() });
@@ -68,6 +72,30 @@ export default function SignUp() {
       <Body muted style={{ fontSize: 14, lineHeight: 20 }}>
         Your password also locks your encryption key. If you forget it, your messages can't be recovered — not even by us.
       </Body>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
+        <Pressable
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: agreed }}
+          accessibilityLabel="I am 18 or older and agree to the Terms of Service and Privacy Policy"
+          onPress={() => {
+            setAgreed((a) => !a);
+            setError(null);
+          }}
+          hitSlop={8}
+          style={{
+            width: 26, height: 26, borderRadius: 8, marginTop: 1, alignItems: 'center', justifyContent: 'center',
+            borderWidth: 2, borderColor: agreed ? colors.roseFill : colors.inkMuted, backgroundColor: agreed ? colors.roseFill : 'transparent',
+          }}
+        >
+          {agreed ? <Icon name="check" color={colors.onRose} size={16} strokeWidth={2.6} /> : null}
+        </Pressable>
+        <Text style={{ flex: 1, fontFamily: fonts.regular, fontSize: 14, lineHeight: 20, color: colors.ink }}>
+          I'm 18 or older and I agree to the{' '}
+          <Text accessibilityRole="link" onPress={() => openLink(LINKS.terms)} style={{ color: colors.rose, fontFamily: fonts.bold }}>Terms of Service</Text>
+          {' '}and{' '}
+          <Text accessibilityRole="link" onPress={() => openLink(LINKS.privacy)} style={{ color: colors.rose, fontFamily: fonts.bold }}>Privacy Policy</Text>.
+        </Text>
+      </View>
       <ErrorText>{error}</ErrorText>
       <Button title="Create account" onPress={submit} loading={busy} />
     </AuthForm>
