@@ -26,9 +26,11 @@ const schema = z.object({
   TURN_CREDENTIAL: z.string().optional(),
   // Moderation API (/admin/*). Leave unset to disable it. At least 32 random characters.
   ADMIN_TOKEN: z.string().min(32).optional(),
-  // Shown on the public pages (/privacy, /terms, /child-safety, /delete-account).
+  // Shown on the public pages (/, /privacy, /terms, /child-safety, /delete-account).
   APP_NAME: z.string().default('Lovenest'),
   CONTACT_EMAIL: z.string().email().default('hz3302m@gmail.com'),
+  // The Google Play listing. Once set, the home page's button links to it instead of the beta sign-up.
+  PLAY_STORE_URL: z.string().url().optional(),
 });
 
 export type Env = z.infer<typeof schema>;

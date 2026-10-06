@@ -646,7 +646,7 @@ describe('store requirements', () => {
 
   it('serves the privacy policy, terms, child-safety standards and account deletion pages', async () => {
     const { app } = ctx;
-    for (const [path, needle] of [['/privacy', 'end-to-end encrypted'], ['/terms', '18 years old'], ['/child-safety', 'zero tolerance'], ['/delete-account', 'You → Account → Delete account']] as const) {
+    for (const [path, needle] of [['/', 'Join the Android beta'], ['/privacy', 'end-to-end encrypted'], ['/terms', '18 years old'], ['/child-safety', 'zero tolerance'], ['/delete-account', 'You → Account → Delete account']] as const) {
       const res = await app.request(path);
       expect(res.status).toBe(200);
       const html = await res.text();
@@ -658,6 +658,12 @@ describe('store requirements', () => {
       const res = await app.request(`/static/${file}`);
       expect(res.status).toBe(200);
       expect(res.headers.get('content-type')).toContain('javascript');
+    }
+    for (const img of ['chat', 'call', 'updates', 'dark']) {
+      const res = await app.request(`/static/img/${img}.jpg`);
+      expect(res.status).toBe(200);
+      expect(res.headers.get('content-type')).toBe('image/jpeg');
+      expect(new Uint8Array(await res.arrayBuffer()).slice(0, 2)).toEqual(new Uint8Array([0xff, 0xd8]));
     }
     expect((await app.request('/static/../package.json')).status).toBe(404);
   });

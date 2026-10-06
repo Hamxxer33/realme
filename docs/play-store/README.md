@@ -41,7 +41,7 @@ PRIVATE BY DESIGN
 • Every chat, photo, voice note and status update is end-to-end encrypted. Not even we can read them.
 • Voice and video calls are encrypted end to end, too.
 • Your password never leaves your phone.
-• Verify a chat's safety number to be sure nobody is in between.
+• Verify a chat's safety number to be sure nobody is listening in.
 
 MADE FOR CLOSENESS
 • One-to-one chats and groups with photos, voice notes and reactions.

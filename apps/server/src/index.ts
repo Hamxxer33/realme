@@ -32,7 +32,7 @@ const { app, injectWebSocket } = createApp({
   },
   jwtSecret: env.JWT_SECRET,
   adminToken: env.ADMIN_TOKEN,
-  site: { appName: env.APP_NAME, contactEmail: env.CONTACT_EMAIL },
+  site: { appName: env.APP_NAME, contactEmail: env.CONTACT_EMAIL, playUrl: env.PLAY_STORE_URL },
   push: expoPush(env.EXPO_ACCESS_TOKEN),
   storage: local?.storage ?? s3Storage({
     endpoint: env.S3_ENDPOINT,

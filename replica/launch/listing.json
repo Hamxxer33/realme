@@ -1,0 +1,26 @@
+{
+  "avoid": [
+    "WhatsApp",
+    "Telegram",
+    "Signal",
+    "Between",
+    "Paired",
+    "Meta",
+    "Facebook",
+    "Facebook Messenger",
+    "Instagram"
+  ],
+  "google_play": {
+    "title": "Lovenest: Private Messenger",
+    "short_description": "End-to-end encrypted chats, calls and moments with the people you love.",
+    "full_description": "Lovenest is a private messenger for the people who matter most — your partner, your family, your closest friends.\n\nPRIVATE BY DESIGN\n• Every chat, photo, voice note and status update is end-to-end encrypted. Not even we can read them.\n• Voice and video calls are encrypted end to end, too.\n• Your password never leaves your phone.\n• Verify a chat's safety number to be sure nobody is listening in.\n\nMADE FOR CLOSENESS\n• One-to-one chats and groups with photos, voice notes and reactions.\n• Send a \"thinking of you\" heart with one tap.\n• Status updates that disappear after 24 hours, only for people you chat with.\n• Read receipts you control — turn them off any time.\n\nSTAY IN THE LOOP\n• Communities bring related groups together, with an announcements chat for everyone.\n• Follow channels for the topics and places you love.\n• Share moments on an optional public timeline.\n\nSAFE AND IN YOUR CONTROL\n• Messages from new people wait in Requests until you accept.\n• Block and report anyone, any time.\n• Delete your account and its data whenever you want.\n• Light and dark themes.\n\nLovenest is for people aged 18 and over."
+  },
+  "app_store": {
+    "name": "Lovenest: Private Messenger",
+    "subtitle": "Private chats for your people",
+    "promotional_text": "Chats, calls and little moments with your partner, family and closest friends. End-to-end encrypted, no ads, no phone number needed.",
+    "description": "Lovenest is a private messenger for the people who matter most — your partner, your family, your closest friends.\n\nPRIVATE BY DESIGN\n• Every chat, photo, voice note and status update is end-to-end encrypted. Not even we can read them.\n• Voice and video calls are encrypted end to end, too.\n• Your password never leaves your phone.\n• Verify a chat's safety number to be sure nobody is listening in.\n\nMADE FOR CLOSENESS\n• One-to-one chats and groups with photos, voice notes and reactions.\n• Send a \"thinking of you\" heart with one tap.\n• Status updates that disappear after 24 hours, only for people you chat with.\n• Read receipts you control — turn them off any time.\n\nSTAY IN THE LOOP\n• Communities bring related groups together, with an announcements chat for everyone.\n• Follow channels for the topics and places you love.\n• Share moments on an optional public timeline.\n\nSAFE AND IN YOUR CONTROL\n• Messages from new people wait in Requests until you accept.\n• Block and report anyone, any time.\n• Delete your account and its data whenever you want.\n• Light and dark themes.\n\nLovenest is for people aged 18 and over.",
+    "keywords": "encrypted,chat,couples,partner,family,secure,calls,video,status,groups,e2ee,love,friends,messages",
+    "whats_new": "Welcome to Lovenest."
+  }
+}
