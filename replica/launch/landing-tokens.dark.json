@@ -1,0 +1,63 @@
+{
+  "_about": "Colours of the home page (apps/server/src/routes/pages.ts), dark theme. Check with: python3 .claude/skills/replica-design/contrast.py this-file",
+  "color": {
+    "bg": "#151016",
+    "surface": "#211A23",
+    "ink": "#F6ECEF",
+    "muted": "#BFA9B0",
+    "rose": "#FF8FB0",
+    "on-rose": "#2A0E18",
+    "tint": "#3A2530",
+    "hero-a": "#2A1A24"
+  },
+  "pairs": [
+    [
+      "ink",
+      "bg"
+    ],
+    [
+      "ink",
+      "surface"
+    ],
+    [
+      "ink",
+      "tint"
+    ],
+    [
+      "ink",
+      "hero-a"
+    ],
+    [
+      "muted",
+      "bg"
+    ],
+    [
+      "muted",
+      "surface"
+    ],
+    [
+      "muted",
+      "tint"
+    ],
+    [
+      "muted",
+      "hero-a"
+    ],
+    [
+      "rose",
+      "bg"
+    ],
+    [
+      "rose",
+      "surface"
+    ],
+    [
+      "rose",
+      "tint"
+    ],
+    [
+      "on-rose",
+      "rose"
+    ]
+  ]
+}

@@ -32,7 +32,7 @@ const { app, injectWebSocket } = createApp({
   },
   jwtSecret: env.JWT_SECRET,
   adminToken: env.ADMIN_TOKEN,
-  site: { appName: env.APP_NAME, contactEmail: env.CONTACT_EMAIL },
+  site: { appName: env.APP_NAME, contactEmail: env.CONTACT_EMAIL, playUrl: env.PLAY_STORE_URL },
   push: expoPush(env.EXPO_ACCESS_TOKEN),
   storage: local?.storage ?? s3Storage({
     endpoint: env.S3_ENDPOINT,
@@ -51,6 +51,9 @@ const server = serve({ fetch: app.fetch, port: env.PORT }, (info) => {
   console.log(`realme server listening on :${info.port}`);
 });
 injectWebSocket(server);
+
+// Last line of defence: a stray rejected promise is a bug to fix, not a reason to drop every live chat.
+process.on('unhandledRejection', (err) => console.error('unhandled rejection', err));
 
 const shutdown = () => server.close(() => void close().then(() => process.exit(0)));
 process.on('SIGINT', shutdown);

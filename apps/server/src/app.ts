@@ -20,6 +20,10 @@ import { registerSafety } from './routes/safety';
 import { registerStatus } from './routes/status';
 import { registerTimeline } from './routes/timeline';
 import type { Storage } from './storage';
+import { uuid } from './validation';
+
+/** A frame from a client, before validation: every field may be anything. */
+type WsFrame = { type?: unknown; token?: unknown; conversationId?: unknown; callId?: unknown; payload?: unknown };
 
 export interface Deps {
   db: DB;
@@ -75,34 +79,20 @@ export function createApp(deps: Deps) {
           if (!userId) ws.close(4001, 'auth timeout');
         }, WS_AUTH_TIMEOUT_MS);
       },
+      // Nothing awaits this handler, so an error thrown here would be an unhandled rejection and take the
+      // whole process down. Anything a client sends must be validated, and any failure is logged and dropped.
       async onMessage(evt, ws: WSContext) {
-        let msg: { type?: string; token?: string; conversationId?: string; callId?: unknown; payload?: unknown };
+        let msg: WsFrame;
         try {
           msg = JSON.parse(String(evt.data));
         } catch {
           return;
         }
-        if (!userId) {
-          const user = msg.type === 'auth' && msg.token ? await userFromToken(ctx, msg.token) : null;
-          if (!user) return ws.close(4001, 'unauthorized');
-          clearTimeout(timer);
-          userId = user.id;
-          hub.add(userId, ws);
-          ws.send(JSON.stringify({ type: 'ready' }));
-          return;
-        }
-        if (msg.type === 'typing' && typeof msg.conversationId === 'string') {
-          const rows = await deps.db.select({ userId: members.userId, status: members.status }).from(members)
-            .where(eq(members.conversationId, msg.conversationId));
-          if (!rows.some((r) => r.userId === userId)) return;
-          // Only people who accepted the chat see typing.
-          hub.send(rows.filter((r) => r.userId !== userId && r.status === 'accepted').map((r) => r.userId), {
-            type: 'typing', conversationId: msg.conversationId, userId,
-          });
-        } else if (msg.type === 'call_signal') {
-          await callSignals.relaySignal(userId, msg);
-        } else if (msg.type === 'ping') {
-          ws.send(JSON.stringify({ type: 'pong' }));
+        if (!msg || typeof msg !== 'object') return;
+        try {
+          await handle(msg, ws);
+        } catch (err) {
+          console.error('websocket message failed', err);
         }
       },
       onClose(_evt, ws) {
@@ -110,6 +100,34 @@ export function createApp(deps: Deps) {
         if (userId) hub.remove(userId, ws);
       },
     };
+
+    async function handle(msg: WsFrame, ws: WSContext) {
+      if (!userId) {
+        const user = msg.type === 'auth' && typeof msg.token === 'string' ? await userFromToken(ctx, msg.token) : null;
+        if (!user) return ws.close(4001, 'unauthorized');
+        clearTimeout(timer);
+        userId = user.id;
+        hub.add(userId, ws);
+        ws.send(JSON.stringify({ type: 'ready' }));
+        return;
+      }
+      if (msg.type === 'typing') {
+        const parsed = uuid.safeParse(msg.conversationId);
+        if (!parsed.success) return;
+        const conversationId = parsed.data;
+        const rows = await deps.db.select({ userId: members.userId, status: members.status }).from(members)
+          .where(eq(members.conversationId, conversationId));
+        if (!rows.some((r) => r.userId === userId)) return;
+        // Only people who accepted the chat see typing.
+        hub.send(rows.filter((r) => r.userId !== userId && r.status === 'accepted').map((r) => r.userId), {
+          type: 'typing', conversationId, userId,
+        });
+      } else if (msg.type === 'call_signal') {
+        await callSignals.relaySignal(userId, msg);
+      } else if (msg.type === 'ping') {
+        ws.send(JSON.stringify({ type: 'pong' }));
+      }
+    }
   }));
 
   app.get('/health', (c) => c.json({ ok: true }));

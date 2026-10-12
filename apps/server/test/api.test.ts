@@ -646,7 +646,7 @@ describe('store requirements', () => {
 
   it('serves the privacy policy, terms, child-safety standards and account deletion pages', async () => {
     const { app } = ctx;
-    for (const [path, needle] of [['/privacy', 'end-to-end encrypted'], ['/terms', '18 years old'], ['/child-safety', 'zero tolerance'], ['/delete-account', 'You → Account → Delete account']] as const) {
+    for (const [path, needle] of [['/', 'Join the Android beta'], ['/privacy', 'end-to-end encrypted'], ['/terms', '18 years old'], ['/child-safety', 'zero tolerance'], ['/delete-account', 'You → Account → Delete account']] as const) {
       const res = await app.request(path);
       expect(res.status).toBe(200);
       const html = await res.text();
@@ -658,6 +658,12 @@ describe('store requirements', () => {
       const res = await app.request(`/static/${file}`);
       expect(res.status).toBe(200);
       expect(res.headers.get('content-type')).toContain('javascript');
+    }
+    for (const img of ['chat', 'call', 'updates', 'dark']) {
+      const res = await app.request(`/static/img/${img}.jpg`);
+      expect(res.status).toBe(200);
+      expect(res.headers.get('content-type')).toBe('image/jpeg');
+      expect(new Uint8Array(await res.arrayBuffer()).slice(0, 2)).toEqual(new Uint8Array([0xff, 0xd8]));
     }
     expect((await app.request('/static/../package.json')).status).toBe(404);
   });
@@ -822,6 +828,44 @@ describe('realtime', () => {
     for (let i = 0; i < 100 && !check(); i++) await new Promise((r) => setTimeout(r, 10));
     expect(check()).toBe(true);
   };
+
+  it('survives malformed frames: bad ids, wrong types and junk are dropped, the socket keeps working', async () => {
+    const [ana, ben] = [await ctx.signup('ana'), await ctx.signup('ben')];
+    const conv = await ctx.direct(ana, ben);
+    await ctx.call('POST', `/conversations/${conv}/accept`, { as: ben });
+    const url = await ctx.listen();
+    const [a, b] = [connect(url, ana.token), connect(url, ben.token)];
+    await Promise.all([a.ready, b.ready]);
+
+    for (const frame of [
+      { type: 'typing', conversationId: 'not-a-uuid' },
+      { type: 'typing', conversationId: { $ne: null } },
+      { type: 'typing', conversationId: 42 },
+      { type: 'call_signal', callId: 'nope', payload: {} },
+      { type: 'call_signal', callId: crypto_uuid(), payload: 'x' },
+      { type: { nested: true } },
+      null,
+      [1, 2, 3],
+    ]) a.ws.send(JSON.stringify(frame));
+    a.ws.send('{not json');
+
+    // Still connected and still relaying.
+    a.ws.send(JSON.stringify({ type: 'typing', conversationId: conv }));
+    await waitFor(() => b.events.some((e) => e.type === 'typing' && e.userId === ana.id));
+    expect(b.events.filter((e) => e.type === 'typing')).toHaveLength(1);
+    expect(a.ws.readyState).toBe(WebSocket.OPEN);
+    for (const s of [a, b]) s.ws.close();
+  });
+
+  it('rejects a non-string token without crashing', async () => {
+    const url = await ctx.listen();
+    const ws = new WebSocket(url);
+    const code = await new Promise<number>((resolve) => {
+      ws.on('open', () => ws.send(JSON.stringify({ type: 'auth', token: { forged: true } })));
+      ws.on('close', (c) => resolve(c));
+    });
+    expect(code).toBe(4001);
+  });
 
   it('delivers messages (with only your own key), typing and read receipts live', async () => {
     const [ana, ben, cat] = [await ctx.signup('ana'), await ctx.signup('ben'), await ctx.signup('cat')];
