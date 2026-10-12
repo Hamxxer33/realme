@@ -52,6 +52,9 @@ const server = serve({ fetch: app.fetch, port: env.PORT }, (info) => {
 });
 injectWebSocket(server);
 
+// Last line of defence: a stray rejected promise is a bug to fix, not a reason to drop every live chat.
+process.on('unhandledRejection', (err) => console.error('unhandled rejection', err));
+
 const shutdown = () => server.close(() => void close().then(() => process.exit(0)));
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
