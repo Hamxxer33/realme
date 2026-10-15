@@ -140,22 +140,22 @@ Captured screens: 24 shots that group into 20 distinct screens or surfaces (S01�
 | ID | screen (shots) | how to reach | purpose | key components | states seen / inferred |
 | --- | --- | --- | --- | --- | --- |
 | S01 | Home feed (24) | App launch; Home tab; double-tap Home (inferred) | Main reading surface | Top bar: feeds menu (2 lines) left, app mark centre, search right. Inline compose row: avatar, name, prompt placeholder, hairline. Feed list. Bottom tab bar, Home active | Seen: loading (5 skeleton post rows). Inferred: loaded, pull to refresh, paging spinner, empty Following, error + retry, offline, new-posts pill. Nothing shows which feed is active |
-| S02 | Feeds drawer (23) | Menu button on S01, or swipe from the left edge. Home slides right with a rounded corner and dims | Switch feeds; Liked/Saved shortcuts; manage custom feeds | Large title. Header icons: add feed (+ in circle), edit (pencil). Two outlined square tiles: heart (Liked), bookmark (Saved). Grouped card: two built-in feeds (recommended, following) | Seen: default with 2 built-in feeds. Inferred: active-feed check, custom feed rows, edit/reorder mode, close by tapping the peek |
+| S02 | Feeds drawer (23) | Menu button on S01, or swipe from the left edge. Home slides right with a rounded corner and dims | Switch feeds; Liked/Saved shortcuts; manage custom feeds | Large title. Header icons: add feed (+ in circle), edit (pencil). Two outlined rounded tiles, side by side: heart (Liked), bookmark (Saved). Grouped card: two built-in feeds (recommended, following) | Seen: default with 2 built-in feeds. Inferred: active-feed check, custom feed rows, edit/reorder mode, close by tapping the peek |
 | S03 | Composer (18, 13) | Centre + tab, or the inline row on S01 | Write a post or multi-part thread with media, topic, location, reply controls, schedule, AI label | Modal sheet. Header: Cancel (text), centred title, drafts icon, overflow (…) icon. Body: avatar with vertical connector line; author name › topic placeholder; multiline input with placeholder; attach toolbar of 6 icons (photo library, camera, GIF, horizontal bars = poll or long-text attachment, meaning inferred; location pin; music note); dimmed add-another-part row with mini avatar. Footer pinned above keyboard: reply-options button (sliders icon) left, Post pill right | Seen: empty, focused, Post disabled (18); overflow menu open with an AI-label item, divider, schedule item with clock icon (13). Inferred: Post enabled, character limit, media strip, poll builder, location/topic chips, scheduled state, 2+ parts with delete, posting progress, failure/retry, save-or-discard on Cancel |
 | S04 | Drafts sheet (17) | Drafts icon in S03 | Restore a saved draft | Stacked modal (S03 peeks behind). Header: Cancel, title | Seen: empty (one centred grey line). Inferred: draft list (preview, thumb, time), delete, open into S03, scheduled section |
 | S05 | GIF picker (14) | GIF icon in S03 | Attach a GIF | Bottom sheet, grabber. Search field naming the provider. Category icon tabs: trending (selected, tonal square), smiley, heart, sad, party, thumbs-up | Seen: error (left-aligned "could not load" line, no retry). Inferred: loading grid, results, search results, no results, attribution |
 | S06 | Location picker (15) | Location icon in S03 after permission | Tag a place | Bottom sheet, grabber. Search field (focused). Current-location arrow button. Keyboard with search key | Seen: focused, empty body. Inferred: nearby list, results, no results, loading, denied = search only |
-| S07 | Location permission explainer (16) | First tap on location in S03, before the OS prompt | Explain location use before asking | Full screen. Hero icon tile. Bold centred title. 3 icon rows (how you can use it / how it's used / how to control it), each heading + body. Full-width primary Continue | Seen: default. Inferred: OS prompt next, denied outcome. Gap: no decline or close control |
+| S07 | Location permission explainer (16) | First tap on location in S03, before the OS prompt | Explain location use before asking | Full screen. Hero icon tile. Bold centred title. 3 icon rows (how you can use it / how it's used / how to control it), each heading + body. Full-width primary Continue | Seen: default. Inferred: OS prompt next, denied outcome. Gap: no decline or close control. The control row says general location is still estimated from the IP address when location services are off (ours: never infer location from IP) |
 | S08 | Messages inbox (22, 21) | Messages tab (paper-plane icon) | DM inbox | Large title, compose icon right. Pill search field. Chip row: filter-icon chip, Inbox (selected, tonal), Requests. Conversation list. Tab bar, Messages active | Seen: loading (7+ skeleton rows) (22); filter popover with a section label and 4 single-select items: all (checked), unread, unanswered, verified (21). Inferred: rows (avatar, name, preview, time, unread dot), empty, search results, no results for a filter, request count, swipe actions |
 | S09 | Message requests (20) | Requests chip on S08 | Review messages from people you don't follow | Nav bar: back, title. Chips: filter icon, Requests (selected), Hidden. List | Seen: loading under the S10 sheet. Inferred: request rows, empty, accept/delete/block |
 | S10 | Requests explainer sheet (20) | Shown on first visit to S09 (trigger inferred) | Explain request rules and safety | Bottom sheet, grabber, scrim. Bold centred title. 3 icon rows: you decide and the sender isn't told; extra protection (no photos, videos or links; harmful or spam hidden); you can limit requests to people you follow. Primary OK, outlined settings shortcut | Seen: open. Inferred: shown once; the settings button deep-links to Privacy › Messages |
 | S11 | Hidden requests (19) | Hidden chip on S09 (pushes a page) | Review filtered/spam requests | Nav bar: back, title. List. No tab bar | Seen: loading (8 skeleton rows). Inferred: rows, empty, delete all, move to Requests |
-| S12 | Activity (11, 12) | Activity tab (heart) | Notifications centre | Large title. Horizontal filter chips: all (selected, light fill), follows, conversations, reposts, with more off-screen (11 is scrolled). Tab bar, Activity active | Seen: error (centred grey line + bold tappable retry) in both shots. Inferred: loading, list grouped by time, per-chip empty, follow-back buttons, unread highlight, tab badge, pull to refresh |
+| S12 | Activity (11, 12) | Activity tab (heart) | Notifications centre | Large title. Horizontal filter chips: all (selected, light fill), follows, conversations, reposts. 12 shows the row at rest; 11 is scrolled to its end with reposts last, so these 4 are all the chips on this account. Tab bar, Activity active | Seen: error (centred grey line + bold tappable retry) in both shots. Inferred: loading, list grouped by time, per-chip empty, follow-back buttons, unread highlight, tab badge, pull to refresh |
 | S13 | Own profile (08, 09, 10) | Profile tab | Identity plus your posts, replies, reposts | Top bar: insights icon left; search and settings gear right. Large display name, username line, XL avatar right. Two equal outlined buttons: edit profile, share profile. Underline tabs: posts / replies / reposts | Seen: all three tabs empty, each with a grey "not available" line (the wrong message for an empty tab). Inferred: bio, links, follower count with stacked avatars, populated lists, loading, private lock |
 | S14 | Settings (07, 01) | Gear on S13 | Settings hub | Nav bar: back, title. Account-hub row (person icon, title, 2-line subtitle: password, security, personal details, connected experiences, ad preferences; parent-company badge). Icon rows without chevrons: follow and invite friends, notifications, saved, liked, archive, privacy, account status, more settings, help, about. Text actions: switch profiles (accent), log out (destructive). Tab bar | Seen: full list (07); dimmed under S15 (01). Inferred: log-out confirm, version footer |
 | S15 | Switch profiles sheet (01) | Switch profiles on S14; long-press Profile tab (inferred) | Switch or add accounts | Bottom sheet, grabber, scrim. Grouped card: current profile row (avatar, name, check); inset divider; add-profile row with circular + | Seen: one profile + add. Inferred: 2+ profiles with unread badges, switching spinner, add flow |
-| S16 | Privacy (05) | Privacy on S14 | Privacy controls | Lock icon + private-profile toggle (off). Icon + chevron rows: mentions, online status, messages, muted, hidden words, profiles you follow, suggesting posts on other apps. Section header with external-link icon and helper text with a learn-more link (links out to the sister app). Rows: blocked profiles, hide like and share counts | Seen: toggle off. Inferred: toggle on, confirm before going private, save failure, trailing values, each sub-page |
-| S17 | Followers and invitations (06) | Follow-and-invite row on S14 (the page title differs from the row label) | Grow your network | Icon rows without chevrons: contacts, invite via share sheet, copy invite link, SMS, then 5 third-party app rows with those apps' logos | Seen: default. Inferred: link-copied toast, contacts permission, OS share sheet |
+| S16 | Privacy (05) | Privacy on S14 | Privacy controls | Lock icon + private-profile toggle (off). Icon + chevron rows: mentions, online status, messages, muted, hidden words, profiles you follow, suggesting posts on other apps. Section header with external-link icon and helper text with a learn-more link (links out to the sister app; the text names restricting an account as one of the settings managed there). Rows: blocked profiles, hide like and share counts | Seen: toggle off. Inferred: toggle on, confirm before going private, save failure, trailing values, each sub-page |
+| S17 | Followers and invitations (06) | Follow-and-invite row on S14 (the page title differs from the row label) | Grow your network | Icon rows without chevrons: contacts, invite via share sheet, copy invite link, SMS, then 5 app rows with logos: 4 third-party apps and 1 that shares the invite as a post in the product itself | Seen: default. Inferred: link-copied toast, contacts permission, OS share sheet |
 | S18 | More settings (04) | More settings on S14 | Secondary preferences | Label + chevron rows: content preferences, time management, media quality, accessibility, political content, language, website permissions | Seen: default. Inferred: each sub-page |
 | S19 | Help (03) | Help on S14 | Support entry points | Label + chevron rows: report a problem, help centre, privacy and security help, support requests | Seen: default. Inferred: report form with screenshot, in-app help browser, ticket list |
 | S20 | About (02) | About on S14 | Legal and transparency | Label + chevron rows: about your profile, parent-company privacy policy and terms, product privacy policy and terms, third-party notices | Seen: default. Inferred: document viewer; account info page |
@@ -200,7 +200,7 @@ F02 Compose a multi-part thread with media, topic and reply options
     edge: Post disabled until content; character limit; poll vs media; GIF load error (seen);
           location denied = search only; upload fails or offline -> retry queue;
           removing a middle part; Cancel with content -> save or discard
-    better: a decline control on S07; audience presets (followers, close friends) next to reply options
+    better: a decline control on S07; audience presets (followers, a close circle) next to reply options
 
 F03 Save a draft and schedule
     save: S03 -> Cancel -> save (S41)                    taps: 2
@@ -280,13 +280,13 @@ F12 Log out
     better: "this device" vs "everywhere"; warn and offer backup first
 
 F13 Get help or report a problem
-    S14 -> Help -> S19 -> report a problem -> form -> send
-    happy path taps: 4
+    S13 -> gear -> S14 -> Help -> S19 -> report a problem -> form -> send
+    happy path taps: 5 (counted from the Profile tab, like F09–F12)
     edge: attach a screenshot; offline queue; ticket status
 
 F14 Read legal pages
-    S14 -> About -> S20 -> document
-    happy path taps: 3
+    S13 -> gear -> S14 -> About -> S20 -> document
+    happy path taps: 4 (counted from the Profile tab)
     edge: offline viewer. Lovenest already has privacy, terms and child-safety pages.
 ```
 
@@ -335,9 +335,10 @@ User          id, username, display_name, bio, +avatar_key, +links (<=5), +is_pr
 UserSettings  user_id, who_can_message (requests_from_everyone | following | nobody),
               who_can_add_to_groups (following | nobody), mentions (everyone | following | nobody),
               show_online_status, hide_counts_default, default_reply_policy, default_quote_policy,
-              default_feed, political_content, language, media_quality, daily_limit_minutes
+              default_feed, political_content, language, media_quality, daily_limit_minutes,
+              quiet_hours, notification_prefs (per type: push | in-app | off)
               Lovenest: only users.read_receipts (schema:23). New table
-              evidence: S16 rows, S18 rows, S10 settings shortcut, S34; V1, N6, N19
+              evidence: S14 notifications row, S16 rows, S18 rows, S10 settings shortcut, S34; V1, N6, N19
               confidence: medium (the enum values are ours)
 
 Follow        follower_id, followee_id, status (accepted | pending), created_at
@@ -346,10 +347,11 @@ Follow        follower_id, followee_id, status (accepted | pending), created_at
               confidence: high
 
 Post          id, author_id, text, created_at, +root_id, +reply_to_id, +position,
-              +quote_of_id, +topic_id, +place_id, +audience (public | followers | close_friends | community),
+              +quote_of_id, +topic_id, +place_id, +audience (public | followers | close_circle | community),
               +reply_policy (everyone | followers | following | mentioned | nobody), +quote_policy,
               +reply_state (visible | pending | hidden), +ai_label, +spoiler, +hide_counts,
-              +status (published | scheduled | deleted), +scheduled_at, +edited_at, +expires_at
+              +status (published | scheduled | archived | deleted), +scheduled_at, +edited_at, +expires_at
+              (a 24-hour post moves to archived at expires_at: the S14 archive row, N28)
               Lovenest: posts (schema:116-127) EXISTS; post_comments (schema:135-141) migrate into
               posts as replies (reply_to_id set)
               evidence: S03 composer, S13 tabs, S22, S23, S34, S35; V9, N14, N15, N21, N22, N28
@@ -365,7 +367,12 @@ PostEdit      post_id, previous_text, edited_at      (ours: visible edit history
               evidence: N22 (Threads has no history)
               confidence: ours
 
-Like          post_id, user_id, created_at
+PostMention   post_id, user_id      (parsed at write time; drives mention notifications,
+              the "who can mention me" check and reply_policy = mentioned)
+              Lovenest: MISSING (post text is stored as-is). evidence: S16 mentions row, S34; V9
+              confidence: high
+
+Like          post_id, user_id, created_at, +is_private (ours: a reaction only the author sees)
               Lovenest: post_likes (schema:129-133) EXISTS; +index on user_id for the Liked list
               evidence: S02 Liked tile, S14 Liked row, PostCard
               confidence: high
@@ -394,7 +401,7 @@ Place         id, provider, provider_place_id, name, locality, approx_lat, appro
 Notification  id, recipient_id, actor_id, type (like | reply | follow | follow_request | mention |
               repost | quote | poll_closed | reply_pending), post_id, group_key, read_at, created_at
               Lovenest: MISSING (push only for messages, calls, channel posts)
-              evidence: S12 chips (all, follows, conversations, reposts, more); N14. confidence: high
+              evidence: S12 chips (all, follows, conversations, reposts); N14. confidence: high
 
 Feed          id, owner_id, name, is_public, rules (keywords[], account_ids[], topic_ids[]);
 FeedPin       user_id, feed_key (built-in or feed id), position, is_default
@@ -404,9 +411,11 @@ FeedSignal    user_id, target_type (topic | account | post), direction (more | l
               Lovenest: MISSING. evidence: V8 (private tuning), N43 (complaint about public tuning)
               confidence: ours
 
-Mute          muter_id, muted_id, scope (posts | replies | all), created_at
-HiddenWord    user_id, phrase, created_at  (applies to feed, replies, search; DMs on device)
-              Lovenest: MISSING (only chat and channel mute). evidence: S16; N17, N18. confidence: high
+Mute          muter_id, muted_id, kind (mute | restrict), scope (posts | replies | all), created_at
+              (restrict = their replies and mentions wait for my approval; S16 helper text, N18)
+WordFilter    user_id, phrase, created_at  (applies to feed, replies, search; DMs on device)
+              Lovenest: MISSING (only chat and channel mute). evidence: S16; N17, N18.
+              confidence: high (mute, word filter), medium (restrict)
 
 Block         blocker_id, blocked_id, created_at
               Lovenest: blocks (schema:143-147) EXISTS, applied both ways via blockRelation
@@ -450,17 +459,23 @@ Relationships:
 - Users relate to Users through Follow, Mute and Block.
 - Users relate to Posts through Like, Repost and Save.
 - A Post has 0 or 1 Topic, 0 or 1 Place and 0 or 1 Poll. A Poll has many PollOptions, and a PollOption has many PollVotes. A Post has many PostMedia rows and many PostEdit rows.
+- A Post mentions many Users through PostMention.
 - A User has many Notifications, each with one actor User.
 - A User owns many Feeds and orders feeds through FeedPin.
-- A User has one UserSettings and many HiddenWords and FeedSignals.
+- A User has one UserSettings and many WordFilters and FeedSignals.
 - Conversations relate to Users through Members, and a Conversation has many Messages.
 - A ModerationAction has 0 or 1 Appeal.
 
-Entities: 31 server tables (11 exist or are extended, 20 new) plus 1 client-side keystore.
+Entities: 33 server tables plus 1 client-side keystore. 8 exist today and some gain columns (users, posts, post_likes, blocks, reports, conversations, conversation_members, messages); 25 are new. Not counted: the Lovenest tables kept or dropped above.
 
 ## Feature matrix
 
-See `features.csv`: 118 rows. Must: 39, should: 43, could: 23, skip: 13. By Threads origin, 94 rows are Threads features (`original=yes`) and 24 are Lovenest additions (`original=no`). Today's `clone` column doubles as the gap list: 17 yes, 26 partial, 75 no.
+See `features.csv`: 121 rows. Must: 43, should: 43, could: 23, skip: 12.
+
+- **Origin.** 109 rows are Threads features (`original=yes`). Many of those rows also carry our improvement in `notes`, marked "ours". 12 rows are purely Lovenest's (`original=no`).
+- **Gap list.** The `clone` column reflects Lovenest today, so it doubles as the gap list: 15 yes, 29 partial, 77 no.
+- **Must rows.** Of the 43 must rows, 13 are done, 17 are partial and 13 are missing.
+- **Wording.** Rows describe functions in our own words. Threads' labels appear only in the screen inventory above, as observations.
 
 ## Better than Threads: the top 8
 
@@ -468,18 +483,18 @@ Each one answers a complaint with evidence behind it. Feature names are ours. Do
 
 1. **Every chat is end-to-end encrypted, and we say so.** Threads DMs and group chats aren't E2EE, and Meta has said they won't be (N3, N1). Lovenest already encrypts 1:1 chats, groups, status and voice notes (`packages/crypto`, schema:83-97) and has a safety-number check (`verify/[id].tsx`). Keep requests encrypted too, and block links and media inside requests on the sender's device, so we match Threads' spam protection (V1) without the server reading anything.
 2. **A real "who can message me" switch.** At launch Threads had no way to turn DMs off, and the backlash came mostly from women worried about harassment (N4, N5). It later added a requests setting (N6). Offer three choices: everyone (as requests), people I follow, nobody. Add "who can add me to groups". It's cheap: requests and block already exist (`chats.ts:121-136`, `routes/safety.ts`).
-3. **A Following-first home that remembers your choice.** The most common complaint is a random, stale feed that drifts back to recommendations: 7 publishers (N50–N56), and more than a third of recommended posts were 6–12 hours old (N52). Default to a chronological Following feed with an "all caught up" marker instead of filler. Keep recommendations in their own feed with an age cap. Show which feed is active (S01 doesn't) and remember the last one opened.
-4. **Private feed tuning, with a reason on every recommendation.** Threads' first tuning tool made your requests public (N43, V6). Its private version only came later (V8). Offer "more / less like this" on any post, person or topic, stored privately (FeedSignal), plus a one-line "why you're seeing this". Hidden words should apply to the feed, replies, search and, on the device, to DMs (N17 covers everything except DMs).
+3. **A Following-first home that remembers your choice.** The most common complaint is a random, stale feed that drifts back to recommendations: 7 publishers (N50–N56), and more than a third of recommended posts were 6–12 hours old (N52). Default to a chronological Following feed with an end-of-new-posts marker instead of filler. Keep recommendations in their own feed with an age cap. Show which feed is active (S01 doesn't) and remember the last one opened.
+4. **Private feed tuning, with a reason on every recommendation.** Threads' first tuning tool made your requests public (N43, V6). Its private version only came later (V8). Offer "more / less like this" on any post, person or topic, stored privately (FeedSignal), plus a one-line reason on each recommendation. Word filters should apply to the feed, replies, search and, on the device, to DMs (N17 covers everything except DMs).
 5. **Ranking that doesn't reward rage bait.** A rage-bait experiment pulled 3,000+ replies (N57), and Meta has said it would cut back on it (N58). Don't rank recommendations mainly on reply volume. Down-rank reply fishing. Weight topics the user picked and people their follows follow.
 6. **Nothing you can't block, and no AI pushed on you.** The company's AI account can't be blocked, only muted (N45–N49), and the backlash trended with 1M+ posts. In Lovenest every account can be blocked, including official ones (block already works on every user through `blockRelation`), and any AI feature is opt-in.
-7. **Authors control their replies.** Threads has reply and quote controls and reply approvals (V9, N14, N15). One source says you can hide replies on your own posts but not delete them (N61, single source). Offer per-post reply and quote policies, approvals, hidden words for replies, and both hide *and* delete on your own posts. Lovenest's post owners can already delete comments (`timeline.ts:109-139`).
-8. **Moderation with a human on the other end.** Wrongful bans and unanswered appeals come up across 8 publishers (N64–N71). Every removal or restriction shows the rule and the content involved, with a one-tap appeal and a stated response time. Never auto-ban on an age guess. Lovenest is small enough to deliver this, and it can build on the existing admin API (`routes/admin.ts:28-112`) and an account-status page.
+7. **Authors control their replies.** Threads has reply and quote controls and reply approvals (V9, N14, N15). One source says you can hide replies on your own posts but not delete them (N61, single source). Offer per-post reply and quote policies, approvals, word filters on replies, and both hide *and* delete on your own posts. Lovenest's post owners can already delete comments (`timeline.ts:109-139`).
+8. **Moderation with a human on the other end.** Wrongful bans and unanswered appeals come up across 8 publishers (N64–N71). Every removal or restriction shows the rule and the content involved, with a one-tap appeal and a stated response time. Never auto-ban on an age guess. Lovenest is small enough to deliver this, and it can build on the existing admin API (`routes/admin.ts:28-112`) and an account-standing page.
 
 Also on the list, in rough order:
 - A standalone account with a clean exit. Email sign-up already exists (`accounts.ts:36-70`), as do in-app and web deletion. Add a data export and never share posts outside the app (N30–N35, N72).
 - No ads at launch, and a published promise of no ads in chats, ever (N36–N39).
-- Choose the audience for each post (public, followers, close friends, a community), plus a 24-hour post that builds on Status. We found no source for a per-post audience on Threads, so don't claim it lacks one.
-- Communities that members start and run themselves. Threads' communities are created by Meta (N7).
+- Choose the audience for each post (public, followers, a close circle, a community), plus a 24-hour post that builds on Status. We found no source for a per-post audience on Threads, so don't claim it lacks one.
+- Communities that members start and run themselves. Threads' communities are created by Meta (N7). Lovenest's are already member-created, but as bundles of group chats (`routes/communities.ts:95`), not public post spaces.
 - Edit history shown on edited posts, which Threads doesn't keep (N22).
 
 ## Out of scope (cannot or should not be cloned)
@@ -511,9 +526,9 @@ Also on the list, in rough order:
 | Activity | None; push only for messages, calls and channel posts | Notifications table, filter chips, live + push |
 | Profile | You tab is a settings list; profile has a post list and post count | Profile tab: photo, bio, links, followers, posts/replies/reposts tabs, edit, share, insights |
 | Messages | E2EE 1:1 + groups, requests, receipts, typing, voice notes, calls from chat | Same, plus inbox/requests chips, hidden folder, filters, status row, call history |
-| Privacy | Read receipts, blocked list, an informational note | Private profile, who can message/mention/add to groups, mute, hidden words, hide counts, online status |
-| Settings | Account, Privacy, My posts, Appearance, Notifications, Help, Invite | Settings hub from the profile gear: invite, notifications, saved, liked, archive, privacy, account status, more settings, help, about, switch profiles, log out |
-| Moderation | Report everything; admin API only (`routes/admin.ts`) | Plus account status, rule shown, appeals with a human reviewer, a small admin dashboard |
+| Privacy | Read receipts, blocked list, an informational note | Private profile, who can message/mention/add to groups, mute, word filters, hide counts, online status |
+| Settings | Account, Privacy, My posts, Appearance, Notifications, Help, Invite | Settings hub from the profile gear: invite, notifications, saved, liked, archive, privacy, account standing, more settings, help, about, switch accounts, log out |
+| Moderation | Report everything; admin API only (`routes/admin.ts`) | Plus an account-standing page, the rule shown, appeals with a human reviewer, a small admin dashboard |
 | Status / Calls / Channels / Communities | Own tabs or sections | Status and call history move into Messages; Channels dropped; Communities behind a flag |
 | Brand | "A private place for the people you love"; 18+ messenger listing | Needs a decision (below) |
 
@@ -539,25 +554,25 @@ Also on the list, in rough order:
    - which content rules apply to public posts versus private chats (the server can't see private chats)
    - whether to build a small admin dashboard before opening public posting
 7. **Third-party providers.** Choose (or skip) a GIF provider and a places provider. Both have API terms, attribution rules and possibly costs.
-8. **Timing against the Play closed test.** The launch blockers (push, TURN, answering calls with the app closed, `docs/roadmap.md:10-12`) don't depend on this change. Choose whether the closed test ships the current messenger first, or waits for the new tabs.
+8. **Timing against the Play closed test.** The launch blockers (push, TURN, answering calls with the app closed, `docs/roadmap.md:12-14`) don't depend on this change. Choose whether the closed test ships the current messenger first, or waits for the new tabs.
 9. **Multiple profiles: now or later.** This needs separate encrypted keystores for each account. Recommend later.
 
 ## Size
 
 - **Screens.** 41 screen IDs: 20 captured and 21 inferred. S38 alone covers about 17 settings sub-pages.
 - **Flows.** 14.
-- **Entities.** 31 tables plus 1 client keystore. 11 of the tables exist today.
+- **Entities.** 33 tables plus 1 client keystore. 8 of the tables exist today.
 
 **Hard parts:**
 1. **Replies become posts, and the follow graph arrives.** Migrating `post_comments` into `posts` and adding follows with private profiles means every feed, profile and search query needs visibility rules alongside `blockRelation`.
 2. **Activity.** Fan-out of notifications over the WebSocket hub (`realtime.ts`) and push, and push registration is still a launch blocker.
 3. **The composer rewrite.** Multi-part posts, carousel and video upload, encrypted autosaved drafts, and a scheduling worker the server doesn't have yet.
 4. **Recommendations with a cold-start network.** The ranking has to be explainable and not reward bait.
-5. **Moderating public posts at Play's bar for user-generated content.** That means appeals, an account-status page and a dashboard.
+5. **Moderating public posts at Play's bar for user-generated content.** That means appeals, an account-standing page and a dashboard.
 6. **Multiple profiles.** Each account needs its own E2EE keystore, and password change needs the key backup re-wrapped on the device.
 
 **Size:**
-- **The core-loop slice (must rows only): L.** About a quarter for one engineer. The server model alone (follows, replies as posts, reposts, notifications) takes roughly 2–4 weeks before the new tabs have real content.
+- **The core-loop slice (must rows only): L.** 30 of the 43 must rows still need work (13 missing, 17 partial). That's about a quarter for a solo founder working with Claude, and only if the closed test isn't being run at the same time. The server model alone (follows, replies as posts, reposts, notifications) takes roughly 2–4 weeks before the new tabs have real content. This is an estimate, not a measurement.
 - **Everything in the matrix: XL.** Rescope to must rows first, then the should rows that make up the top-8 "better" list.
 
 Next step: `/replica-architect`.
