@@ -12,3 +12,6 @@ web-build/
 
 # Google Play upload key for `eas submit` — never commit
 apps/mobile/google-play-service-account.json
+
+# Reference screenshots of other apps: research only, never shipped or committed
+replica/screens/
